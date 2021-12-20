@@ -1,11 +1,9 @@
-use std::str::FromStr;
+// Reference:
+//   https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
 
 grammar;
 
 // TODO: Implement Classic LB v1 and v2 log formats
-pub Term: i32 = {
-    <n:Num> => n,
-    "(" <t:Term> ")" => t,
-};
 
-Num: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
+// TODO: Is full ISO8601 implementation required?
+pub Timestamp: &'input str = <s:r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z"> => s;
