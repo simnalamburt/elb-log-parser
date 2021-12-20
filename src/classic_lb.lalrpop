@@ -1,9 +1,26 @@
-// Reference:
-//   https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
+//! #### Reference
+//! - https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
 
 grammar;
 
 // TODO: Implement Classic LB v1 and v2 log formats
 
-// TODO: Is full ISO8601 implementation required?
-pub Timestamp: &'input str = <s:r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z"> => s;
+/// > The time when the load balancer received the request from the client, in
+/// > ISO 8601 format.
+///
+/// Instead of full ISO 8601 format, only "YYYY-MM-DDTHH:MM:SS.xxxxxxZ" format
+/// is supported.
+///
+/// #### Reference
+/// - https://datatracker.ietf.org/doc/html/rfc3339
+pub Timestamp: &'input str = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z" => <>;
+
+/// > The name of the load balancer.
+/// >
+/// > This name must be unique within your set of load balancers for the region,
+/// > must have a maximum of 32 characters, must contain only alphanumeric
+/// > characters or hyphens, and cannot begin or end with a hyphen.
+///
+/// #### Reference
+/// - https://docs.aws.amazon.com/elasticloadbalancing/2012-06-01/APIReference/API_CreateLoadBalancer.html#API_CreateLoadBalancer_RequestParameters
+pub Name: &'input str = r"[0-9A-Za-z][0-9A-Za-z\-]{0,30}[0-9A-Za-z]|[0-9A-Za-z]" => <>;
