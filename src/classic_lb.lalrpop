@@ -25,8 +25,8 @@ pub Log: ClassicLBLog<'input> =
     <backend_status_code:Int>
     <received_bytes:Int>
     <sent_bytes:Int>
+    <request:QuotedString>
     // TODO
-    //<request:QuotedString>
     //<user_agent:QuotedString>
     //pub ssl_cipher: &'input str,
     //pub ssl_protocol: &'input str,
@@ -42,6 +42,8 @@ NullableIPAndPort = { "-", IPAndPort };
 Int = r"[0-9]+";
 ProcessingTime = { Int, r"[0-9]+\.[0-9]+", "-1" };
 
+QuotedString = r#""([^"])*""#;
+
 // TODO
 pub(crate) Test: () = {
     "Timestamp" Timestamp => (),
@@ -50,4 +52,5 @@ pub(crate) Test: () = {
     "NullableIPAndPort" NullableIPAndPort => (),
     "Int" Int => (),
     "ProcessingTime" ProcessingTime => (),
+    "QuotedString" QuotedString => (),
 }

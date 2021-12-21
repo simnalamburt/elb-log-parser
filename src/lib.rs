@@ -48,9 +48,9 @@ pub struct ClassicLBLog<'input> {
     pub backend_status_code: &'input str,
     pub received_bytes: &'input str,
     pub sent_bytes: &'input str,
+    pub request: &'input str,
 
     // TODO
-    //pub request: &'input str,
     //pub user_agent: &'input str,
     //pub ssl_cipher: &'input str,
     //pub ssl_protocol: &'input str,
@@ -149,6 +149,19 @@ mod tests {
         e("ProcessingTime -.");
         e("ProcessingTime .00100");
         e("ProcessingTime 00100.");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_quoted_string() -> TestResult {
+        t(r#"QuotedString """#)?;
+        t(r#"QuotedString "asdf""#)?;
+        t(r#"QuotedString "Asdf adsf 1234""#)?;
+        t(r#"QuotedString "asdf\"yolo\"asdf""#)?;
+        t(r#"QuotedString "asdf \"Swag\" asdf""#)?;
+
+        e(r#"QuotedString "asdf "Yay\" asdf""#);
 
         Ok(())
     }
