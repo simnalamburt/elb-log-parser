@@ -2,6 +2,7 @@ use elb_log_parser::classic_lb::LogParser;
 
 // TODO: Test Classic LB v1 and v2 log formats
 
+/*
 #[test]
 fn test_classic_lb_log_parse() {
     let log = LogParser::new().parse(
@@ -21,3 +22,4 @@ fn test_classic_lb_log_parse() {
     assert_eq!(log.sent_bytes, "57");
     // TODO
 }
+*/

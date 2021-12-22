@@ -1,4 +1,10 @@
 use std::str::CharIndices;
+use std::ops::Range;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Tok<'input> {
+    String(&'input str),
+}
 
 #[derive(PartialEq, Eq)]
 enum LexerState {
@@ -26,7 +32,7 @@ impl<'input> Lexer<'input> {
 }
 
 impl<'input> Iterator for Lexer<'input> {
-    type Item = &'input str;
+    type Item = (usize, Tok<'input>, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
         use LexerState::{Normal, Word, Quoted, QuotedSlash, Finished};
@@ -38,15 +44,15 @@ impl<'input> Iterator for Lexer<'input> {
             ret = match (&self.state, input) {
                 (Normal, ..) => None,
 
-                (&Word { start }, None) => Some(&self.input[start..]),
-                (&Word { start }, Some((i, ' ' | '\t' | '\n' | '\r'))) => Some(&self.input[start..i]),
+                (&Word { start }, None) => Some(start..self.input.len()),
+                (&Word { start }, Some((i, ' ' | '\t' | '\n' | '\r'))) => Some(start..i),
                 (Word { .. }, Some(..)) => None,
 
-                (&Quoted { start }, None) => Some(&self.input[start..]),
-                (&Quoted { start }, Some((i, '"'))) => Some(&self.input[start..i+1]),
+                (&Quoted { start }, None) => Some(start..self.input.len()),
+                (&Quoted { start }, Some((i, '"'))) => Some(start..i+1),
                 (Quoted { .. }, Some(..)) => None,
 
-                (&QuotedSlash { start }, None) => Some(&self.input[start..]),
+                (&QuotedSlash { start }, None) => Some(start..self.input.len()),
                 (QuotedSlash { .. }, Some(..)) => None,
 
                 (Finished, _) => unreachable!(),
@@ -70,14 +76,14 @@ impl<'input> Iterator for Lexer<'input> {
                 (Finished, _) => unreachable!(),
             }
         }
-        ret
+        ret.map(|Range { start, end }| (start, Tok::String(&self.input[start..end]), end))
     }
 }
 
 #[test]
 fn test_lexer() {
     fn t<const N: usize>(input: &str, expected: [&str; N]) {
-        assert_eq!(Lexer::new(input).collect::<Vec<_>>(), expected)
+        assert_eq!(Lexer::new(input).map(|(_, Tok::String(s), _)| s).collect::<Vec<_>>(), expected)
     }
 
     t("", []);

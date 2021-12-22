@@ -60,17 +60,18 @@ pub struct ClassicLBLog<'input> {
 
 #[cfg(test)]
 mod tests {
-    use lalrpop_util::{lexer, ParseError};
+    use lalrpop_util::ParseError;
     use crate::classic_lb::TestParser;
+    use crate::lex::{Tok, Lexer};
 
-    type TestResult = Result<(), ParseError<usize, lexer::Token<'static>, &'static str>>;
+    type TestResult = Result<(), ParseError<usize, Tok<'static>, &'static str>>;
 
     fn t(input: &'static str) -> TestResult {
-        TestParser::new().parse(input)
+        TestParser::new().parse(input, Lexer::new(input))
     }
 
     fn e(input: &'static str) {
-        assert!(TestParser::new().parse(input).is_err());
+        assert!(TestParser::new().parse(input, Lexer::new(input)).is_err());
     }
 
     #[test]
