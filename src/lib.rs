@@ -1,5 +1,7 @@
 use lalrpop_util::lalrpop_mod;
 
+mod lex;
+
 lalrpop_mod!(pub classic_lb);
 
 // TODO:
