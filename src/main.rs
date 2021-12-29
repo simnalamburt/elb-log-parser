@@ -1,4 +1,4 @@
-use std::io::{stdin, stdout, BufRead, Write};
+use std::io::{stdin, stdout, BufRead, BufWriter, Write};
 
 use regex::Regex;
 use serde::Serialize;
@@ -116,7 +116,8 @@ fn main() {
     let stdout = stdout();
 
     let stdin = stdin.lock();
-    let mut stdout = stdout.lock();
+    let stdout = stdout.lock();
+    let mut stdout = BufWriter::new(stdout);
 
     let parser = Parser::new();
     for line in stdin.lines() {
