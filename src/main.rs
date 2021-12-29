@@ -1,4 +1,4 @@
-use std::io::{stdin, stdout, Write, BufRead};
+use std::io::{stdin, stdout, BufRead, Write};
 
 use regex::Regex;
 use serde::Serialize;
@@ -34,7 +34,8 @@ impl Parser {
     fn new() -> Self {
         Self {
             // https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
-            regex: Regex::new(r#"(?x)
+            regex: Regex::new(
+                r#"(?x)
                 ^
                 ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
                 \x20
@@ -76,32 +77,34 @@ impl Parser {
                 \x20
                 (TLSv[0-9.]+|-)                                     # ssl protocol
                 $
-            "#).unwrap()
+            "#,
+            )
+            .unwrap(),
         }
     }
 
     fn log_to_json(&self, log: &str) -> String {
         let caps = self.regex.captures(log).unwrap();
         let log = Log {
-            time:                       &caps[1],
-            elb:                        &caps[2],
-            client_ip:                  &caps[3],
-            client_port:                &caps[4],
-            backend_ip:                 &caps[5],
-            backend_port:               &caps[6],
-            request_processing_time:    &caps[7],
-            backend_processing_time:    &caps[8],
-            response_processing_time:   &caps[9],
-            elb_status_code:            &caps[10],
-            backend_status_code:        &caps[11],
-            received_bytes:             &caps[12],
-            sent_bytes:                 &caps[13],
-            http_method:                &caps[14],
-            url:                        &caps[15],
-            http_version:               &caps[16],
-            user_agent:                 &caps[17],
-            ssl_cipher:                 &caps[18],
-            ssl_protocol:               &caps[19],
+            time: &caps[1],
+            elb: &caps[2],
+            client_ip: &caps[3],
+            client_port: &caps[4],
+            backend_ip: &caps[5],
+            backend_port: &caps[6],
+            request_processing_time: &caps[7],
+            backend_processing_time: &caps[8],
+            response_processing_time: &caps[9],
+            elb_status_code: &caps[10],
+            backend_status_code: &caps[11],
+            received_bytes: &caps[12],
+            sent_bytes: &caps[13],
+            http_method: &caps[14],
+            url: &caps[15],
+            http_version: &caps[16],
+            user_agent: &caps[17],
+            ssl_cipher: &caps[18],
+            ssl_protocol: &caps[19],
         };
 
         serde_json::to_string(&log).unwrap()
