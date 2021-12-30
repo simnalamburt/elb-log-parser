@@ -1,6 +1,6 @@
 use std::io::{stdin, stdout, BufRead, BufWriter, Write};
 
-use regex::Regex;
+use regex::{CaptureLocations, Regex};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -28,83 +28,92 @@ struct Log<'a> {
 
 struct Parser {
     regex: Regex,
+    locs: CaptureLocations,
 }
 
 impl Parser {
     fn new() -> Self {
-        Self {
-            // https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
-            regex: Regex::new(
-                r#"(?x)
-                ^
-                ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
+        // https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
+        let regex = Regex::new(
+            r#"(?x)
+            ^
+            ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
+            \x20
+            ([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9-])?)         # elb
+            \x20
+            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})    # client ip
+            :
+            ([0-9]{1,5})                                        # client port
+            \x20
+            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})    # backend ip
+            :
+            ([0-9]{1,5}|-)                                      # backend port
+            \x20
+            ([0-9]+\.[0-9]+|-1)                                 # request processing time
+            \x20
+            ([0-9]+\.[0-9]+|-1)                                 # backend processing time
+            \x20
+            ([0-9]+\.[0-9]+|-1)                                 # response processing time
+            \x20
+            ([0-9]{3}|-)                                        # elb status code
+            \x20
+            ([0-9]{3}|-)                                        # backend status code
+            \x20
+            ([0-9]+)                                            # received bytes
+            \x20
+            ([0-9]+)                                            # sent bytes
+            \x20
+            "
+                (-|[A-Z]+)                                      # http method
                 \x20
-                ([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9-])?)         # elb
+                ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)         # URL
                 \x20
-                ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})    # client ip
-                :
-                ([0-9]{1,5})                                        # client port
-                \x20
-                ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})    # backend ip
-                :
-                ([0-9]{1,5}|-)                                      # backend port
-                \x20
-                ([0-9]+\.[0-9]+|-1)                                 # request processing time
-                \x20
-                ([0-9]+\.[0-9]+|-1)                                 # backend processing time
-                \x20
-                ([0-9]+\.[0-9]+|-1)                                 # response processing time
-                \x20
-                ([0-9]{3}|-)                                        # elb status code
-                \x20
-                ([0-9]{3}|-)                                        # backend status code
-                \x20
-                ([0-9]+)                                            # received bytes
-                \x20
-                ([0-9]+)                                            # sent bytes
-                \x20
-                "
-                    (-|[A-Z]+)                                      # http method
-                    \x20
-                    ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)         # URL
-                    \x20
-                    (-\x20|HTTP/[0-9.]+)                            # http version
-                "
-                \x20
-                ("(?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*")           # user agent
-                \x20
-                ([0-9A-Z-]+)                                        # ssl cipher
-                \x20
-                (TLSv[0-9.]+|-)                                     # ssl protocol
-                $
-            "#,
-            )
-            .unwrap(),
-        }
+                (-\x20|HTTP/[0-9.]+)                            # http version
+            "
+            \x20
+            ("(?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*")           # user agent
+            \x20
+            ([0-9A-Z-]+)                                        # ssl cipher
+            \x20
+            (TLSv[0-9.]+|-)                                     # ssl protocol
+            $
+        "#,
+        )
+        .unwrap();
+        let locs = regex.capture_locations();
+
+        Self { regex, locs }
     }
 
-    fn parse<'input>(&self, log: &'input str) -> Log<'input> {
-        let caps = self.regex.captures(log).unwrap();
+    // TODO: interior mutability
+    fn parse<'input>(&mut self, log: &'input str) -> Log<'input> {
+        self.regex.captures_read(&mut self.locs, log).unwrap();
+
+        let s = |i| {
+            let (start, end) = self.locs.get(i).unwrap();
+            &log[start..end]
+        };
+
         Log {
-            time: caps.get(1).unwrap().as_str(),
-            elb: caps.get(2).unwrap().as_str(),
-            client_ip: caps.get(3).unwrap().as_str(),
-            client_port: caps.get(4).unwrap().as_str(),
-            backend_ip: caps.get(5).unwrap().as_str(),
-            backend_port: caps.get(6).unwrap().as_str(),
-            request_processing_time: caps.get(7).unwrap().as_str(),
-            backend_processing_time: caps.get(8).unwrap().as_str(),
-            response_processing_time: caps.get(9).unwrap().as_str(),
-            elb_status_code: caps.get(10).unwrap().as_str(),
-            backend_status_code: caps.get(11).unwrap().as_str(),
-            received_bytes: caps.get(12).unwrap().as_str(),
-            sent_bytes: caps.get(13).unwrap().as_str(),
-            http_method: caps.get(14).unwrap().as_str(),
-            url: caps.get(15).unwrap().as_str(),
-            http_version: caps.get(16).unwrap().as_str(),
-            user_agent: caps.get(17).unwrap().as_str(),
-            ssl_cipher: caps.get(18).unwrap().as_str(),
-            ssl_protocol: caps.get(19).unwrap().as_str(),
+            time: s(1),
+            elb: s(2),
+            client_ip: s(3),
+            client_port: s(4),
+            backend_ip: s(5),
+            backend_port: s(6),
+            request_processing_time: s(7),
+            backend_processing_time: s(8),
+            response_processing_time: s(9),
+            elb_status_code: s(10),
+            backend_status_code: s(11),
+            received_bytes: s(12),
+            sent_bytes: s(13),
+            http_method: s(14),
+            url: s(15),
+            http_version: s(16),
+            user_agent: s(17),
+            ssl_cipher: s(18),
+            ssl_protocol: s(19),
         }
     }
 }
@@ -117,7 +126,7 @@ fn main() {
     let stdout = stdout.lock();
     let mut stdout = BufWriter::new(stdout);
 
-    let parser = Parser::new();
+    let mut parser = Parser::new();
     for line in stdin.lines() {
         let line = line.unwrap();
         let json = parser.parse(&line);
@@ -128,10 +137,10 @@ fn main() {
 
 #[test]
 fn test_parser() {
-    let parser = Parser::new();
-    let t = |input, expected| {
+    let mut parser = Parser::new();
+    let mut t = |input, expected| {
         assert_eq!(
-            serde_json::to_string(&parser.parse(input)).unwrap(),
+            serde_json::to_string(&mut parser.parse(input)).unwrap(),
             expected
         )
     };
