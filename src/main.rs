@@ -3,6 +3,7 @@ use std::io::{stdin, stdout, BufRead, BufWriter, Write};
 
 use regex::{CaptureLocations, Regex};
 use serde::Serialize;
+use serde_json::to_writer;
 
 #[derive(Serialize)]
 struct Log<'a> {
@@ -131,8 +132,8 @@ fn main() {
     for line in stdin.lines() {
         let line = line.unwrap();
         let json = parser.parse(&line);
-        let string = serde_json::to_string(&json).unwrap();
-        writeln!(stdout, "{}", string).unwrap();
+        to_writer(&mut stdout, &json).unwrap();
+        stdout.write(b"\n").unwrap();
     }
 }
 
