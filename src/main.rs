@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::io::{stdin, stdout, BufRead, BufWriter, Write};
 
 use regex::{CaptureLocations, Regex};
@@ -28,7 +29,7 @@ struct Log<'a> {
 
 struct Parser {
     regex: Regex,
-    locs: CaptureLocations,
+    locs: RefCell<CaptureLocations>,
 }
 
 impl Parser {
@@ -80,17 +81,17 @@ impl Parser {
         "#,
         )
         .unwrap();
-        let locs = regex.capture_locations();
+        let locs = RefCell::new(regex.capture_locations());
 
         Self { regex, locs }
     }
 
-    // TODO: interior mutability
-    fn parse<'input>(&mut self, log: &'input str) -> Log<'input> {
-        self.regex.captures_read(&mut self.locs, log).unwrap();
+    fn parse<'input>(&self, log: &'input str) -> Log<'input> {
+        let mut locs = self.locs.borrow_mut();
+        self.regex.captures_read(&mut locs, log).unwrap();
 
         let s = |i| {
-            let (start, end) = self.locs.get(i).unwrap();
+            let (start, end) = locs.get(i).unwrap();
             &log[start..end]
         };
 
@@ -126,7 +127,7 @@ fn main() {
     let stdout = stdout.lock();
     let mut stdout = BufWriter::new(stdout);
 
-    let mut parser = Parser::new();
+    let parser = Parser::new();
     for line in stdin.lines() {
         let line = line.unwrap();
         let json = parser.parse(&line);
@@ -137,8 +138,8 @@ fn main() {
 
 #[test]
 fn test_parser() {
-    let mut parser = Parser::new();
-    let mut t = |input, expected| {
+    let parser = Parser::new();
+    let t = |input, expected| {
         assert_eq!(
             serde_json::to_string(&mut parser.parse(input)).unwrap(),
             expected
