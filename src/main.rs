@@ -1,31 +1,55 @@
 use std::cell::RefCell;
 use std::io::{stdin, stdout, BufRead, BufWriter, Write};
 
-use regex::{CaptureLocations, Regex};
-use serde::Serialize;
+use regex::bytes::{CaptureLocations, Regex};
+use serde::{Serialize, Serializer};
 use serde_json::to_writer;
 
 #[derive(Serialize)]
 struct Log<'a> {
-    time: &'a str,
-    elb: &'a str,
-    client_ip: &'a str,
-    client_port: &'a str,
-    backend_ip: &'a str,
-    backend_port: &'a str,
-    request_processing_time: &'a str,
-    backend_processing_time: &'a str,
-    response_processing_time: &'a str,
-    elb_status_code: &'a str,
-    backend_status_code: &'a str,
-    received_bytes: &'a str,
-    sent_bytes: &'a str,
-    http_method: &'a str,
-    url: &'a str,
-    http_version: &'a str,
-    user_agent: &'a str,
-    ssl_cipher: &'a str,
-    ssl_protocol: &'a str,
+    #[serde(serialize_with = "bytes_ser")]
+    time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    elb: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    client_ip: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    client_port: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    backend_ip: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    backend_port: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    request_processing_time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    backend_processing_time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    response_processing_time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    elb_status_code: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    backend_status_code: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    received_bytes: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    sent_bytes: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    http_method: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    url: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    http_version: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    user_agent: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    ssl_cipher: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    ssl_protocol: &'a [u8],
+}
+
+fn bytes_ser<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+    // TODO: Deal with unwrapping
+    serializer.serialize_str(std::str::from_utf8(bytes).unwrap())
 }
 
 struct Parser {
@@ -78,6 +102,7 @@ impl Parser {
             ([0-9A-Z-]+)                                        # ssl cipher
             \x20
             (TLSv[0-9.]+|-)                                     # ssl protocol
+            \x0A?
             $
         "#,
         )
@@ -87,8 +112,9 @@ impl Parser {
         Self { regex, locs }
     }
 
-    fn parse<'input>(&self, log: &'input str) -> Log<'input> {
+    fn parse<'input>(&self, log: &'input [u8]) -> Log<'input> {
         let mut locs = self.locs.borrow_mut();
+        // TODO: Deal with unwrapping
         self.regex.captures_read(&mut locs, log).unwrap();
 
         let s = |i| {
@@ -122,18 +148,23 @@ impl Parser {
 
 fn main() {
     let stdin = stdin();
-    let stdout = stdout();
+    let mut stdin = stdin.lock();
 
-    let stdin = stdin.lock();
+    let mut buffer = Vec::new();
+    let parser = Parser::new();
+
+    let stdout = stdout();
     let stdout = stdout.lock();
     let mut stdout = BufWriter::new(stdout);
 
-    let parser = Parser::new();
-    for line in stdin.lines() {
-        let line = line.unwrap();
-        let json = parser.parse(&line);
-        to_writer(&mut stdout, &json).unwrap();
+    // TODO: Deal with unwrapping
+    while stdin.read_until(b'\n', &mut buffer).unwrap() > 0 {
+        let log = parser.parse(&buffer);
+        // TODO: Deal with unwrapping
+        to_writer(&mut stdout, &log).unwrap();
+        // TODO: Deal with unwrapping
         stdout.write(b"\n").unwrap();
+        buffer.clear();
     }
 }
 
@@ -148,19 +179,23 @@ fn test_parser() {
     };
 
     t(
-        r#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.000073 0.001048 0.000057 200 200 0 29 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.38.0" - -"#,
+        br#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.000073 0.001048 0.000057 200 200 0 29 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.38.0" - -
+"#,
         r#"{"time":"2015-05-13T23:39:43.945958Z","elb":"my-loadbalancer","client_ip":"192.168.131.39","client_port":"2817","backend_ip":"10.0.0.1","backend_port":"80","request_processing_time":"0.000073","backend_processing_time":"0.001048","response_processing_time":"0.000057","elb_status_code":"200","backend_status_code":"200","received_bytes":"0","sent_bytes":"29","http_method":"GET","url":"http://www.example.com:80/","http_version":"HTTP/1.1","user_agent":"\"curl/7.38.0\"","ssl_cipher":"-","ssl_protocol":"-"}"#,
     );
     t(
-        r#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.000086 0.001048 0.001337 200 200 0 57 "GET https://www.example.com:443/ HTTP/1.1" "curl/7.38.0" DHE-RSA-AES128-SHA TLSv1.2"#,
+        br#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.000086 0.001048 0.001337 200 200 0 57 "GET https://www.example.com:443/ HTTP/1.1" "curl/7.38.0" DHE-RSA-AES128-SHA TLSv1.2
+"#,
         r#"{"time":"2015-05-13T23:39:43.945958Z","elb":"my-loadbalancer","client_ip":"192.168.131.39","client_port":"2817","backend_ip":"10.0.0.1","backend_port":"80","request_processing_time":"0.000086","backend_processing_time":"0.001048","response_processing_time":"0.001337","elb_status_code":"200","backend_status_code":"200","received_bytes":"0","sent_bytes":"57","http_method":"GET","url":"https://www.example.com:443/","http_version":"HTTP/1.1","user_agent":"\"curl/7.38.0\"","ssl_cipher":"DHE-RSA-AES128-SHA","ssl_protocol":"TLSv1.2"}"#,
     );
     t(
-        r#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.001069 0.000028 0.000041 - - 82 305 "- - - " "-" - -"#,
+        br#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.001069 0.000028 0.000041 - - 82 305 "- - - " "-" - -
+"#,
         r#"{"time":"2015-05-13T23:39:43.945958Z","elb":"my-loadbalancer","client_ip":"192.168.131.39","client_port":"2817","backend_ip":"10.0.0.1","backend_port":"80","request_processing_time":"0.001069","backend_processing_time":"0.000028","response_processing_time":"0.000041","elb_status_code":"-","backend_status_code":"-","received_bytes":"82","sent_bytes":"305","http_method":"-","url":"-","http_version":"- ","user_agent":"\"-\"","ssl_cipher":"-","ssl_protocol":"-"}"#,
     );
     t(
-        r#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.001065 0.000015 0.000023 - - 57 502 "- - - " "-" ECDHE-ECDSA-AES128-GCM-SHA256 TLSv1.2"#,
+        br#"2015-05-13T23:39:43.945958Z my-loadbalancer 192.168.131.39:2817 10.0.0.1:80 0.001065 0.000015 0.000023 - - 57 502 "- - - " "-" ECDHE-ECDSA-AES128-GCM-SHA256 TLSv1.2
+"#,
         r#"{"time":"2015-05-13T23:39:43.945958Z","elb":"my-loadbalancer","client_ip":"192.168.131.39","client_port":"2817","backend_ip":"10.0.0.1","backend_port":"80","request_processing_time":"0.001065","backend_processing_time":"0.000015","response_processing_time":"0.000023","elb_status_code":"-","backend_status_code":"-","received_bytes":"57","sent_bytes":"502","http_method":"-","url":"-","http_version":"- ","user_agent":"\"-\"","ssl_cipher":"ECDHE-ECDSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2"}"#,
     );
 }
