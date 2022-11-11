@@ -1,0 +1,259 @@
+use std::cell::RefCell;
+
+use anyhow::Result;
+use regex::bytes::{CaptureLocations, Regex};
+use serde::{ser, Serialize, Serializer};
+use thiserror::Error;
+
+fn bytes_ser<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let str = std::str::from_utf8(bytes)
+        .map_err(|_| ser::Error::custom("log contains invalid UTF-8 characters"))?;
+    serializer.serialize_str(str)
+}
+
+#[derive(Serialize)]
+pub struct Log<'a> {
+    #[serde(serialize_with = "bytes_ser")]
+    pub r#type: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub elb: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub client_ip: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub client_port: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub target_ip: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub target_port: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub request_processing_time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub target_processing_time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub response_processing_time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub elb_status_code: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub target_status_code: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub received_bytes: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub sent_bytes: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub http_method: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub url: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub http_version: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub user_agent: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub ssl_cipher: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub ssl_protocol: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub target_group_arn: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub trace_id: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub domain_name: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub chosen_cert_arn: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub matched_rule_priority: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub request_creation_time: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub actions_executed: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub redirect_url: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub error_reason: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub target_ip_port_list: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub target_status_code_list: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub classification: &'a [u8],
+    #[serde(serialize_with = "bytes_ser")]
+    pub classification_reason: &'a [u8],
+}
+
+#[derive(Error, Debug)]
+pub enum ParseLogError {
+    #[error("Invalid log line: {0:?}")]
+    InvalidLogFormat(Vec<u8>),
+}
+
+pub struct LogParser {
+    regex: Regex,
+    locs: RefCell<CaptureLocations>,
+}
+
+impl LogParser {
+    pub fn new() -> Self {
+        // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-log-entry-format
+        let regex = Regex::new(
+            r#"(?x)
+            ^
+            (http|https|h2|grpcs|ws|wss)                            # type
+            \x20
+            ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
+            \x20
+            ([a-zA-Z0-9](?:[/a-zA-Z0-9-]*[a-zA-Z0-9])?)             # elb
+            \x20
+            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})        # client ip
+            :
+            ([0-9]{1,5})                                            # client port
+            \x20
+            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})        # target ip
+            :
+            ([0-9]{1,5}|-)                                          # target port
+            \x20
+            ([0-9]+\.[0-9]+|-1)                                     # request processing time
+            \x20
+            ([0-9]+\.[0-9]+|-1)                                     # target processing time
+            \x20
+            ([0-9]+\.[0-9]+|-1)                                     # response processing time
+            \x20
+            ([0-9]{3}|-)                                            # elb status code
+            \x20
+            ([0-9]{3}|-)                                            # target status code
+            \x20
+            ([0-9]+)                                                # received bytes
+            \x20
+            ([0-9]+)                                                # sent bytes
+            \x20
+            "
+                (-|[A-Z]+)                                          # http method
+                \x20
+                ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)             # URL
+                \x20
+                (-\x20|HTTP/[0-9.]+)                                # http version
+            "
+            \x20
+            ("(?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*")               # user agent
+            \x20
+            ([0-9A-Z-]+)                                            # ssl cipher
+            \x20
+            (TLSv[0-9.]+|-)                                         # ssl protocol
+            \x20
+            (arn:[^\x20]*)                                          # target_group_arn
+            \x20
+            "((?:[^\\"]|\\")*)"                                     # trace_id
+            \x20
+            "([0-9A-Za-z.\-]*)"                                     # domain_name
+            \x20
+            "(arn:(?:[^\\"]|\\")*)"                                 # chosen_cert_arn
+            \x20
+            ([0-9]{1,5}|-1)                                         # matched_rule_priority
+            \x20
+            ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # request_creation_time
+            \x20
+            "([a-z-]*)"                                             # actions_executed
+            \x20
+            "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*|-)"             # redirect_url
+            \x20
+            "([a-zA-Z]+|-)"                                         # error_reason
+            \x20
+            "(
+                (?:
+                    [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}
+                    (?:\x20[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5})*
+                )
+                |
+                -
+            )"                                                      # target_ip_port_list
+            \x20
+            "(
+                (?:
+                    [0-9]{3}
+                    (?:\x20[0-9]{3})*
+                )
+                |
+                -
+            )"                                                      # target_status_code_list
+            \x20
+            "(Acceptable|Ambiguous|Severe|-)"                       # classification
+            \x20
+            "([a-zA-Z]+|-)"                                         # classification_reason
+            \x0A?
+            $
+        "#,
+        )
+        .unwrap();
+        let locs = RefCell::new(regex.capture_locations());
+
+        Self { regex, locs }
+    }
+
+    pub fn parse<'input>(&self, log: &'input [u8]) -> Result<Log<'input>, ParseLogError> {
+        let mut locs = self.locs.borrow_mut();
+        self.regex
+            .captures_read(&mut locs, log)
+            .ok_or_else(|| ParseLogError::InvalidLogFormat(log.to_owned()))?;
+
+        let s = |i| {
+            let (start, end) = locs.get(i).unwrap();
+            &log[start..end]
+        };
+
+        Ok(Log {
+            r#type: s(1),
+            time: s(2),
+            elb: s(3),
+            client_ip: s(4),
+            client_port: s(5),
+            target_ip: s(6),
+            target_port: s(7),
+            request_processing_time: s(8),
+            target_processing_time: s(9),
+            response_processing_time: s(10),
+            elb_status_code: s(11),
+            target_status_code: s(12),
+            received_bytes: s(13),
+            sent_bytes: s(14),
+            http_method: s(15),
+            url: s(16),
+            http_version: s(17),
+            user_agent: s(18),
+            ssl_cipher: s(19),
+            ssl_protocol: s(20),
+            target_group_arn: s(21),
+            trace_id: s(22),
+            domain_name: s(23),
+            chosen_cert_arn: s(24),
+            matched_rule_priority: s(25),
+            request_creation_time: s(26),
+            actions_executed: s(27),
+            redirect_url: s(28),
+            error_reason: s(29),
+            target_ip_port_list: s(30),
+            target_status_code_list: s(31),
+            classification: s(32),
+            classification_reason: s(33),
+        })
+    }
+}
+
+#[test]
+fn test_log_parser() -> Result<()> {
+    let parser = LogParser::new();
+    let t = |input, expected| -> Result<()> {
+        assert_eq!(serde_json::to_string(&mut parser.parse(input)?)?, expected);
+        Ok(())
+    };
+
+    t(
+        br#"h2 2022-11-01T23:50:27.908737Z app/my-alb/1234567890abcdef 123.123.123.123:65432 10.0.10.0:8080 0.000 0.004 0.000 200 200 288 131 "GET https://example.com HTTP/2.0" "Mozilla/5.0 (iPhone; CPU iPhone OS 15_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/15.6.1 iPhone12,3" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-2:1234567890:targetgroup/mytargetgroup/0123456789abcdef "Root=1-12345678-01234567890123456789" "example.com" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 5 2022-11-01T23:50:27.904000Z "forward" "-" "-" "10.0.10.0:8080" "200" "-" "-"
+"#,
+        r#"{"type":"h2","time":"2022-11-01T23:50:27.908737Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip":"10.0.10.0","target_port":"8080","request_processing_time":"0.000","target_processing_time":"0.004","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"288","sent_bytes":"131","http_method":"GET","url":"https://example.com","http_version":"HTTP/2.0","user_agent":"\"Mozilla/5.0 (iPhone; CPU iPhone OS 15_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/15.6.1 iPhone12,3\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:1234567890:targetgroup/mytargetgroup/0123456789abcdef","trace_id":"Root=1-12345678-01234567890123456789","domain_name":"example.com","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"5","request_creation_time":"2022-11-01T23:50:27.904000Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.10.0:8080","target_status_code_list":"200","classification":"-","classification_reason":"-"}"#,
+    )?;
+
+    Ok(())
+}

@@ -1,4 +1,5 @@
 mod classic_lb;
+mod alb;
 
 use crate::classic_lb::LogParser;
 use std::io::{stdin, stdout, BufRead, BufWriter, Write};
