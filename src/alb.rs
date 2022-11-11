@@ -4,7 +4,7 @@ use anyhow::Result;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{ser, Serialize, Serializer};
 
-use crate::parse::ParseLogError;
+use crate::parse::{LBLogParser, ParseLogError};
 
 fn bytes_ser<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
@@ -186,8 +186,12 @@ impl LogParser {
 
         Self { regex, locs }
     }
+}
 
-    pub fn parse<'input>(&self, log: &'input [u8]) -> Result<Log<'input>, ParseLogError> {
+impl LBLogParser for LogParser {
+    type Log<'input> = self::Log<'input>;
+
+    fn parse<'input>(&self, log: &'input [u8]) -> Result<Log<'input>, ParseLogError> {
         let mut locs = self.locs.borrow_mut();
         self.regex
             .captures_read(&mut locs, log)
