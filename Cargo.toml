@@ -12,3 +12,4 @@ serde_json = "1"
 
 anyhow = "1"
 thiserror = "1"
+clap = { version = "4.0.22", features = ["derive"] }
