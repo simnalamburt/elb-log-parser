@@ -3,7 +3,8 @@ use std::cell::RefCell;
 use anyhow::Result;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{ser, Serialize, Serializer};
-use thiserror::Error;
+
+use crate::parse::ParseLogError;
 
 fn bytes_ser<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
@@ -82,12 +83,6 @@ pub struct Log<'a> {
     pub classification: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
     pub classification_reason: &'a [u8],
-}
-
-#[derive(Error, Debug)]
-pub enum ParseLogError {
-    #[error("Invalid log line: {0:?}")]
-    InvalidLogFormat(Vec<u8>),
 }
 
 pub struct LogParser {
