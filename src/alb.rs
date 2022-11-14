@@ -28,9 +28,7 @@ pub struct Log<'a> {
     #[serde(serialize_with = "bytes_ser")]
     pub client_port: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
-    pub target_ip: &'a [u8],
-    #[serde(serialize_with = "bytes_ser")]
-    pub target_port: &'a [u8],
+    pub target_ip_port: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
     pub request_processing_time: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
@@ -106,9 +104,7 @@ impl LogParser {
             :
             ([0-9]{1,5})                                            # client port
             \x20
-            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})        # target ip
-            :
-            ([0-9]{1,5}|-)                                          # target port
+            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}|-)   # target ip port
             \x20
             ([0-9]+\.[0-9]+|-1)                                     # request processing time
             \x20
@@ -208,34 +204,33 @@ impl LBLogParser for LogParser {
             elb: s(3),
             client_ip: s(4),
             client_port: s(5),
-            target_ip: s(6),
-            target_port: s(7),
-            request_processing_time: s(8),
-            target_processing_time: s(9),
-            response_processing_time: s(10),
-            elb_status_code: s(11),
-            target_status_code: s(12),
-            received_bytes: s(13),
-            sent_bytes: s(14),
-            http_method: s(15),
-            url: s(16),
-            http_version: s(17),
-            user_agent: s(18),
-            ssl_cipher: s(19),
-            ssl_protocol: s(20),
-            target_group_arn: s(21),
-            trace_id: s(22),
-            domain_name: s(23),
-            chosen_cert_arn: s(24),
-            matched_rule_priority: s(25),
-            request_creation_time: s(26),
-            actions_executed: s(27),
-            redirect_url: s(28),
-            error_reason: s(29),
-            target_ip_port_list: s(30),
-            target_status_code_list: s(31),
-            classification: s(32),
-            classification_reason: s(33),
+            target_ip_port: s(6),
+            request_processing_time: s(7),
+            target_processing_time: s(8),
+            response_processing_time: s(9),
+            elb_status_code: s(10),
+            target_status_code: s(11),
+            received_bytes: s(12),
+            sent_bytes: s(13),
+            http_method: s(14),
+            url: s(15),
+            http_version: s(16),
+            user_agent: s(17),
+            ssl_cipher: s(18),
+            ssl_protocol: s(19),
+            target_group_arn: s(20),
+            trace_id: s(21),
+            domain_name: s(22),
+            chosen_cert_arn: s(23),
+            matched_rule_priority: s(24),
+            request_creation_time: s(25),
+            actions_executed: s(26),
+            redirect_url: s(27),
+            error_reason: s(28),
+            target_ip_port_list: s(29),
+            target_status_code_list: s(30),
+            classification: s(31),
+            classification_reason: s(32),
         })
     }
 }
@@ -251,7 +246,7 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"h2 2022-11-01T23:50:27.908737Z app/my-alb/1234567890abcdef 123.123.123.123:65432 10.0.10.0:8080 0.000 0.004 0.000 200 200 288 131 "GET https://example.com HTTP/2.0" "Mozilla/5.0 (iPhone; CPU iPhone OS 15_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/15.6.1 iPhone12,3" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-2:1234567890:targetgroup/mytargetgroup/0123456789abcdef "Root=1-12345678-01234567890123456789" "example.com" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 5 2022-11-01T23:50:27.904000Z "forward" "-" "-" "10.0.10.0:8080" "200" "-" "-"
 "#,
-        r#"{"type":"h2","time":"2022-11-01T23:50:27.908737Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip":"10.0.10.0","target_port":"8080","request_processing_time":"0.000","target_processing_time":"0.004","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"288","sent_bytes":"131","http_method":"GET","url":"https://example.com","http_version":"HTTP/2.0","user_agent":"\"Mozilla/5.0 (iPhone; CPU iPhone OS 15_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/15.6.1 iPhone12,3\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:1234567890:targetgroup/mytargetgroup/0123456789abcdef","trace_id":"Root=1-12345678-01234567890123456789","domain_name":"example.com","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"5","request_creation_time":"2022-11-01T23:50:27.904000Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.10.0:8080","target_status_code_list":"200","classification":"-","classification_reason":"-"}"#,
+        r#"{"type":"h2","time":"2022-11-01T23:50:27.908737Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip_port":"10.0.10.0:8080","request_processing_time":"0.000","target_processing_time":"0.004","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"288","sent_bytes":"131","http_method":"GET","url":"https://example.com","http_version":"HTTP/2.0","user_agent":"\"Mozilla/5.0 (iPhone; CPU iPhone OS 15_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/15.6.1 iPhone12,3\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:1234567890:targetgroup/mytargetgroup/0123456789abcdef","trace_id":"Root=1-12345678-01234567890123456789","domain_name":"example.com","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"5","request_creation_time":"2022-11-01T23:50:27.904000Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.10.0:8080","target_status_code_list":"200","classification":"-","classification_reason":"-"}"#,
     )?;
 
     Ok(())
