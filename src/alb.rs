@@ -195,7 +195,7 @@ impl LBLogParser for LogParser {
         let mut locs = self.locs.borrow_mut();
         self.regex
             .captures_read(&mut locs, log)
-            .ok_or_else(|| ParseLogError::InvalidLogFormat(log.to_owned()))?;
+            .ok_or_else(|| ParseLogError::InvalidLogFormat(String::from_utf8_lossy(log).to_string()))?;
 
         let s = |i| {
             let (start, end) = locs.get(i).unwrap();

@@ -4,8 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ParseLogError {
-    #[error("Invalid log line: {0:?}")]
-    InvalidLogFormat(Vec<u8>),
+    #[error("Invalid log line: {0}")]
+    InvalidLogFormat(String),
 }
 
 pub trait LBLogParser {
