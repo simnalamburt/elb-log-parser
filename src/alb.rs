@@ -121,7 +121,7 @@ impl LogParser {
             ([0-9]+)                                                # sent bytes
             \x20
             "
-                (-|[A-Z]+)                                          # http method
+                (-|[A-Z_]+)                                         # http method
                 \x20
                 ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)             # URL
                 \x20
@@ -262,6 +262,11 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"https 2022-11-02T16:16:31.662027Z app/myalb/0123456789012 123.123.123.123:54321 - -1 -1 -1 503 - 199 184 "GET https://10.100.10.100:443/ HTTP/1.1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 - "Root=1-abcdefgh-abcd-efgh-ijkl-0123456789" "*" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 0 2022-11-02T16:16:31.661000Z "fixed-response" "-" "-" "-" "-" "-" "-""#,
         r#"{"type":"https","time":"2022-11-02T16:16:31.662027Z","elb":"app/myalb/0123456789012","client_ip":"123.123.123.123","client_port":"54321","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"503","target_status_code":"-","received_bytes":"199","sent_bytes":"184","http_method":"GET","url":"https://10.100.10.100:443/","http_version":"HTTP/1.1","user_agent":"\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"-","trace_id":"Root=1-abcdefgh-abcd-efgh-ijkl-0123456789","domain_name":"*","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"0","request_creation_time":"2022-11-02T16:16:31.661000Z","actions_executed":"fixed-response","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
+    )?;
+
+    t(
+        br#"https 2022-11-02T16:16:31.662027Z app/myalb/0123456789012 123.123.123.123:54321 - -1 -1 -1 400 - 192 272 "SSTP_DUPLEX_POST https://10.100.10.100:443/sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/ HTTP/1.1" "-" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 - "-" "-" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" - 2022-11-02T16:16:31.661000Z "-" "-" "-" "-" "-" "-" "-""#,
+        r#"{"type":"https","time":"2022-11-02T16:16:31.662027Z","elb":"app/myalb/0123456789012","client_ip":"123.123.123.123","client_port":"54321","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"400","target_status_code":"-","received_bytes":"192","sent_bytes":"272","http_method":"SSTP_DUPLEX_POST","url":"https://10.100.10.100:443/sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/","http_version":"HTTP/1.1","user_agent":"\"-\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"-","trace_id":"-","domain_name":"-","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"-","request_creation_time":"2022-11-02T16:16:31.661000Z","actions_executed":"-","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
     )?;
 
     Ok(())
