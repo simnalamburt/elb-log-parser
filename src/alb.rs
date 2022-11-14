@@ -140,7 +140,7 @@ impl LogParser {
             \x20
             "([0-9A-Za-z.\-]*)"                                     # domain_name
             \x20
-            "(arn:(?:[^\\"]|\\")*|-)"                               # chosen_cert_arn
+            "(arn:(?:[^\\"]|\\")*|session-reused|-)"                # chosen_cert_arn
             \x20
             ([0-9]{1,5}|-1|-)                                       # matched_rule_priority
             \x20
@@ -252,6 +252,11 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"http 2022-11-03T21:10:11.091427Z app/my-alb/1234567890abcdef 123.123.123.123:65432 - -1 -1 -1 400 - 0 272 "- http://example.com:8080- -" "-" - - - "-" "-" "-" - 2022-11-03T21:10:10.933000Z "-" "-" "-" "-" "-" "-" "-""#,
         r#"{"type":"http","time":"2022-11-03T21:10:11.091427Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"400","target_status_code":"-","received_bytes":"0","sent_bytes":"272","http_method":"-","url":"http://example.com:8080-","http_version":"-","user_agent":"\"-\"","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"-","trace_id":"-","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"-","request_creation_time":"2022-11-03T21:10:10.933000Z","actions_executed":"-","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#,
+    )?;
+
+    t(
+        br#"h2 2022-11-03T10:05:44.872310Z app/myalb/0123456789012 123.123.123.123:54321 10.0.10.0:8080 0.000 0.003 0.000 200 200 285 131 "GET https://example.com:443/api/ HTTP/2.0" "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/16.0 iPhone13,1" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-2:0123456789:targetgroup/mytargetgrouop/01234567890 "Root=1-abcdefgh-abcd-efgh-ijkl-0123456789" "example.com" "session-reused" 5 2022-11-03T10:05:44.869000Z "forward" "-" "-" "10.0.10.0:8080" "200" "-" "-""#,
+        r#"{"type":"h2","time":"2022-11-03T10:05:44.872310Z","elb":"app/myalb/0123456789012","client_ip":"123.123.123.123","client_port":"54321","target_ip_port":"10.0.10.0:8080","request_processing_time":"0.000","target_processing_time":"0.003","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"285","sent_bytes":"131","http_method":"GET","url":"https://example.com:443/api/","http_version":"HTTP/2.0","user_agent":"\"Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/16.0 iPhone13,1\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:0123456789:targetgroup/mytargetgrouop/01234567890","trace_id":"Root=1-abcdefgh-abcd-efgh-ijkl-0123456789","domain_name":"example.com","chosen_cert_arn":"session-reused","matched_rule_priority":"5","request_creation_time":"2022-11-03T10:05:44.869000Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.10.0:8080","target_status_code_list":"200","classification":"-","classification_reason":"-"}"#
     )?;
 
     Ok(())
