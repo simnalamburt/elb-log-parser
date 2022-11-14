@@ -2,7 +2,7 @@ mod alb;
 mod classic_lb;
 mod parse;
 
-use std::fs::File;
+use std::fs::{metadata, File};
 use std::io::{stdin, BufReader};
 
 use crate::alb::LogParser as ALBLogParser;
@@ -43,6 +43,12 @@ fn main() -> Result<()> {
                 .map(|s| s.ends_with(".log.gz"))
                 .unwrap_or(false)
             {
+                continue;
+            }
+
+            // Check for an empty file
+            let metadata = metadata(path)?;
+            if !metadata.is_file() || metadata.len() == 0 {
                 continue;
             }
 
