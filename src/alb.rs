@@ -123,7 +123,7 @@ impl LogParser {
             "
                 (-|[A-Z_]+)                                         # http method
                 \x20
-                ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)             # URL
+                ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2,8})*)        # URL
                 \x20
                 (-\x20?|HTTP/[0-9.]+)                               # http version
             "
