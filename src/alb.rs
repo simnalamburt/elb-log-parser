@@ -125,7 +125,7 @@ impl LogParser {
                 \x20
                 ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)             # URL
                 \x20
-                (-\x20|HTTP/[0-9.]+)                                # http version
+                (-\x20?|HTTP/[0-9.]+)                               # http version
             "
             \x20
             ("(?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*")               # user agent
@@ -134,15 +134,15 @@ impl LogParser {
             \x20
             (TLSv[0-9.]+|-)                                         # ssl protocol
             \x20
-            (arn:[^\x20]*)                                          # target_group_arn
+            (arn:[^\x20]*|-)                                        # target_group_arn
             \x20
             "((?:[^\\"]|\\")*)"                                     # trace_id
             \x20
             "([0-9A-Za-z.\-]*)"                                     # domain_name
             \x20
-            "(arn:(?:[^\\"]|\\")*)"                                 # chosen_cert_arn
+            "(arn:(?:[^\\"]|\\")*|-)"                               # chosen_cert_arn
             \x20
-            ([0-9]{1,5}|-1)                                         # matched_rule_priority
+            ([0-9]{1,5}|-1|-)                                       # matched_rule_priority
             \x20
             ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # request_creation_time
             \x20
@@ -247,6 +247,11 @@ fn test_log_parser() -> Result<()> {
         br#"h2 2022-11-01T23:50:27.908737Z app/my-alb/1234567890abcdef 123.123.123.123:65432 10.0.10.0:8080 0.000 0.004 0.000 200 200 288 131 "GET https://example.com HTTP/2.0" "Mozilla/5.0 (iPhone; CPU iPhone OS 15_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/15.6.1 iPhone12,3" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-2:1234567890:targetgroup/mytargetgroup/0123456789abcdef "Root=1-12345678-01234567890123456789" "example.com" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 5 2022-11-01T23:50:27.904000Z "forward" "-" "-" "10.0.10.0:8080" "200" "-" "-"
 "#,
         r#"{"type":"h2","time":"2022-11-01T23:50:27.908737Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip_port":"10.0.10.0:8080","request_processing_time":"0.000","target_processing_time":"0.004","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"288","sent_bytes":"131","http_method":"GET","url":"https://example.com","http_version":"HTTP/2.0","user_agent":"\"Mozilla/5.0 (iPhone; CPU iPhone OS 15_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MYAPP/4.2.1 iOS/15.6.1 iPhone12,3\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:1234567890:targetgroup/mytargetgroup/0123456789abcdef","trace_id":"Root=1-12345678-01234567890123456789","domain_name":"example.com","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"5","request_creation_time":"2022-11-01T23:50:27.904000Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.10.0:8080","target_status_code_list":"200","classification":"-","classification_reason":"-"}"#,
+    )?;
+
+    t(
+        br#"http 2022-11-03T21:10:11.091427Z app/my-alb/1234567890abcdef 123.123.123.123:65432 - -1 -1 -1 400 - 0 272 "- http://example.com:8080- -" "-" - - - "-" "-" "-" - 2022-11-03T21:10:10.933000Z "-" "-" "-" "-" "-" "-" "-""#,
+        r#"{"type":"http","time":"2022-11-03T21:10:11.091427Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"400","target_status_code":"-","received_bytes":"0","sent_bytes":"272","http_method":"-","url":"http://example.com:8080-","http_version":"-","user_agent":"\"-\"","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"-","trace_id":"-","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"-","request_creation_time":"2022-11-03T21:10:10.933000Z","actions_executed":"-","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#,
     )?;
 
     Ok(())
