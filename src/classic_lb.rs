@@ -26,9 +26,7 @@ pub struct Log<'a> {
     #[serde(serialize_with = "bytes_ser")]
     pub client_port: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
-    pub backend_ip: &'a [u8],
-    #[serde(serialize_with = "bytes_ser")]
-    pub backend_port: &'a [u8],
+    pub backend_ip_port: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
     pub request_processing_time: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
@@ -76,9 +74,7 @@ impl LogParser {
             :
             ([0-9]{1,5})                                        # client port
             \x20
-            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})    # backend ip
-            :
-            ([0-9]{1,5}|-)                                      # backend port
+            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}|-)   # backend ip port
             \x20
             ([0-9]+\.[0-9]+|-1)                                 # request processing time
             \x20
@@ -88,7 +84,7 @@ impl LogParser {
             \x20
             ([0-9]{3}|-)                                        # elb status code
             \x20
-            ([0-9]{3}|-)                                        # backend status code
+            ([0-9]{1,3}|-)                                      # backend status code
             \x20
             ([0-9]+)                                            # received bytes
             \x20
@@ -137,21 +133,20 @@ impl LBLogParser for LogParser {
             elb: s(2),
             client_ip: s(3),
             client_port: s(4),
-            backend_ip: s(5),
-            backend_port: s(6),
-            request_processing_time: s(7),
-            backend_processing_time: s(8),
-            response_processing_time: s(9),
-            elb_status_code: s(10),
-            backend_status_code: s(11),
-            received_bytes: s(12),
-            sent_bytes: s(13),
-            http_method: s(14),
-            url: s(15),
-            http_version: s(16),
-            user_agent: s(17),
-            ssl_cipher: s(18),
-            ssl_protocol: s(19),
+            backend_ip_port: s(5),
+            request_processing_time: s(6),
+            backend_processing_time: s(7),
+            response_processing_time: s(8),
+            elb_status_code: s(9),
+            backend_status_code: s(10),
+            received_bytes: s(11),
+            sent_bytes: s(12),
+            http_method: s(13),
+            url: s(14),
+            http_version: s(15),
+            user_agent: s(16),
+            ssl_cipher: s(17),
+            ssl_protocol: s(18),
         })
     }
 }
