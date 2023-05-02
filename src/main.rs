@@ -38,9 +38,14 @@ fn main() -> Result<()> {
             let entry = entry?;
             let path = entry.path();
 
+            let ext = match args.r#type {
+                Type::Alb => ".log.gz",
+                Type::ClassicLb => ".log",
+            };
+
             if !path
                 .to_str()
-                .map(|s| s.ends_with(".log.gz"))
+                .map(|s| s.ends_with(ext))
                 .unwrap_or(false)
             {
                 continue;
@@ -53,10 +58,10 @@ fn main() -> Result<()> {
             }
 
             // TODO: Apply parallelism
-            let f = BufReader::new(GzDecoder::new(File::open(path)?));
+            let f = File::open(path)?;
             match args.r#type {
-                Type::Alb => repl(f, ALBLogParser::new())?,
-                Type::ClassicLb => repl(f, ClassicLBLogParser::new())?,
+                Type::Alb => repl(BufReader::new(GzDecoder::new(f)), ALBLogParser::new())?,
+                Type::ClassicLb => repl(BufReader::new(f), ClassicLBLogParser::new())?,
             }
         }
     } else {
