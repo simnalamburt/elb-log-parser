@@ -139,7 +139,7 @@ impl LogParser {
             \x20
             "((?:[^\\"]|\\")*)"                                     # trace_id
             \x20
-            "([0-9A-Za-z.\-\*]*)"                                   # domain_name
+            "([0-9A-Za-z.\-\*:]*)"                                  # domain_name
             \x20
             "(arn:(?:[^\\"]|\\")*|session-reused|-)"                # chosen_cert_arn
             \x20
@@ -274,6 +274,11 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"http 2020-01-01T22:22:22.222222Z app/myalb/0123456789abcdef 123.123.123.123:12345 10.0.10.0:80 0.001 0.007 0.000 404 404 19 997 "GET http://myalb-012345678.ap-northeast-2.elb.amazonaws.com:80/ HTTP/1.0 " "-" - - arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytargetgroup/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" "-" "-" 0 2020-01-01T22:22:22.222222Z "forward" "-" "-" "10.0.10.0:80" "404" "Acceptable" "NonCompliantVersion""#,
         r#"{"type":"http","time":"2020-01-01T22:22:22.222222Z","elb":"app/myalb/0123456789abcdef","client_ip":"123.123.123.123","client_port":"12345","target_ip_port":"10.0.10.0:80","request_processing_time":"0.001","target_processing_time":"0.007","response_processing_time":"0.000","elb_status_code":"404","target_status_code":"404","received_bytes":"19","sent_bytes":"997","http_method":"GET","url":"http://myalb-012345678.ap-northeast-2.elb.amazonaws.com:80/","http_version":"HTTP/1.0","user_agent":"\"-\"","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytargetgroup/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"0","request_creation_time":"2020-01-01T22:22:22.222222Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.10.0:80","target_status_code_list":"404","classification":"Acceptable","classification_reason":"NonCompliantVersion"}"#
+    )?;
+
+    t(
+        br#"https 2023-05-02T22:52:38.170624Z app/myalb/0123456789abcdef 123.123.123.123:12345 - -1 -1 -1 503 - 241 739 "GET https://12.123.123.12:443/ HTTP/1.1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" "12.123.123.12:443" "arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 0 2023-05-02T22:52:38.170000Z "forward" "-" "-" "-" "-" "-" "-""#,
+        r#"{"type":"https","time":"2023-05-02T22:52:38.170624Z","elb":"app/myalb/0123456789abcdef","client_ip":"123.123.123.123","client_port":"12345","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"503","target_status_code":"-","received_bytes":"241","sent_bytes":"739","http_method":"GET","url":"https://12.123.123.12:443/","http_version":"HTTP/1.1","user_agent":"\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"12.123.123.12:443","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"0","request_creation_time":"2023-05-02T22:52:38.170000Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
     )?;
 
     Ok(())
