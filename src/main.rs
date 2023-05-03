@@ -43,11 +43,7 @@ fn main() -> Result<()> {
                 Type::ClassicLb => ".log",
             };
 
-            if !path
-                .to_str()
-                .map(|s| s.ends_with(ext))
-                .unwrap_or(false)
-            {
+            if !path.to_str().map(|s| s.ends_with(ext)).unwrap_or(false) {
                 continue;
             }
 
