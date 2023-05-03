@@ -14,7 +14,7 @@ use flate2::read::GzDecoder;
 use walkdir::WalkDir;
 
 #[derive(Parser)]
-#[command(about, arg_required_else_help(true))]
+#[command(about, version, arg_required_else_help(true))]
 struct Args {
     /// Type of load balancer.
     #[arg(value_enum, short, long, default_value_t = Type::Alb)]
