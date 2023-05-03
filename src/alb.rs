@@ -126,6 +126,7 @@ impl LogParser {
                 ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2,8})*)        # URL
                 \x20
                 (-\x20?|HTTP/[0-9.]+)                               # http version
+                \x20?                                               # MEMO: We've observed undocumented space character here in real world data
             "
             \x20
             ("(?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*")               # user agent
@@ -267,6 +268,12 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"https 2022-11-02T16:16:31.662027Z app/myalb/0123456789012 123.123.123.123:54321 - -1 -1 -1 400 - 192 272 "SSTP_DUPLEX_POST https://10.100.10.100:443/sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/ HTTP/1.1" "-" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 - "-" "-" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" - 2022-11-02T16:16:31.661000Z "-" "-" "-" "-" "-" "-" "-""#,
         r#"{"type":"https","time":"2022-11-02T16:16:31.662027Z","elb":"app/myalb/0123456789012","client_ip":"123.123.123.123","client_port":"54321","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"400","target_status_code":"-","received_bytes":"192","sent_bytes":"272","http_method":"SSTP_DUPLEX_POST","url":"https://10.100.10.100:443/sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/","http_version":"HTTP/1.1","user_agent":"\"-\"","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"-","trace_id":"-","domain_name":"-","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"-","request_creation_time":"2022-11-02T16:16:31.661000Z","actions_executed":"-","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
+    )?;
+
+    // MEMO: We've observed undocumented space character after HTTP version in real world data
+    t(
+        br#"http 2020-01-01T22:22:22.222222Z app/myalb/0123456789abcdef 123.123.123.123:12345 10.0.10.0:80 0.001 0.007 0.000 404 404 19 997 "GET http://myalb-012345678.ap-northeast-2.elb.amazonaws.com:80/ HTTP/1.0 " "-" - - arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytargetgroup/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" "-" "-" 0 2020-01-01T22:22:22.222222Z "forward" "-" "-" "10.0.10.0:80" "404" "Acceptable" "NonCompliantVersion""#,
+        r#"{"type":"http","time":"2020-01-01T22:22:22.222222Z","elb":"app/myalb/0123456789abcdef","client_ip":"123.123.123.123","client_port":"12345","target_ip_port":"10.0.10.0:80","request_processing_time":"0.001","target_processing_time":"0.007","response_processing_time":"0.000","elb_status_code":"404","target_status_code":"404","received_bytes":"19","sent_bytes":"997","http_method":"GET","url":"http://myalb-012345678.ap-northeast-2.elb.amazonaws.com:80/","http_version":"HTTP/1.0","user_agent":"\"-\"","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytargetgroup/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"0","request_creation_time":"2020-01-01T22:22:22.222222Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.10.0:80","target_status_code_list":"404","classification":"Acceptable","classification_reason":"NonCompliantVersion"}"#
     )?;
 
     Ok(())
