@@ -18,6 +18,11 @@ Options:
   -V, --version      Print version
 ```
 
+### Installation (macOS)
+```bash
+brew install simnalamburt/x/elb-log-parser
+```
+
 &nbsp;
 
 --------
