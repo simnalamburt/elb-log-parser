@@ -14,14 +14,14 @@ use flate2::read::GzDecoder;
 use walkdir::WalkDir;
 
 #[derive(Parser)]
-#[command(about)]
+#[command(about, arg_required_else_help(true))]
 struct Args {
     /// Type of load balancer.
     #[arg(value_enum, short, long, default_value_t = Type::Alb)]
     r#type: Type,
 
-    /// Path of directory containing load balancer logs. If not present, reads from stdin.
-    path: Option<String>,
+    /// Path of directory containing load balancer logs. To read from stdin, use "-".
+    path: String,
 }
 
 #[derive(ValueEnum, Clone)]
@@ -33,8 +33,8 @@ enum Type {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if let Some(path) = args.path {
-        for entry in WalkDir::new(path) {
+    if args.path != "-" {
+        for entry in WalkDir::new(args.path) {
             let entry = entry?;
             let path = entry.path();
 
