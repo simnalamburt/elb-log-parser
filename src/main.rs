@@ -10,7 +10,7 @@ use crate::classic_lb::LogParser as ClassicLBLogParser;
 use crate::parse::repl;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use walkdir::WalkDir;
 
 #[derive(Parser)]
@@ -56,7 +56,7 @@ fn main() -> Result<()> {
             // TODO: Apply parallelism
             let f = File::open(path)?;
             match args.r#type {
-                Type::Alb => repl(BufReader::new(GzDecoder::new(f)), ALBLogParser::new())?,
+                Type::Alb => repl(BufReader::new(MultiGzDecoder::new(f)), ALBLogParser::new())?,
                 Type::ClassicLb => repl(BufReader::new(f), ClassicLBLogParser::new())?,
             }
         }
