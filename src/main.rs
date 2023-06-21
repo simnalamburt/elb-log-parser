@@ -34,27 +34,27 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     if args.path != "-" {
+        // TODO: Apply parallelism
         for entry in WalkDir::new(args.path) {
-            let entry = entry?;
+            let entry = entry?; // TODO: Warn and skip instead of fail
             let path = entry.path();
 
+            // ALB logs must ends with '.log.gz', and Classic LB logs must ends with '.log'
             let ext = match args.r#type {
                 Type::Alb => ".log.gz",
                 Type::ClassicLb => ".log",
             };
-
             if !path.to_str().map(|s| s.ends_with(ext)).unwrap_or(false) {
                 continue;
             }
 
             // Check for an empty file
-            let metadata = metadata(path)?;
+            let metadata = metadata(path)?; // TODO: Warn and skip instead of fail
             if !metadata.is_file() || metadata.len() == 0 {
                 continue;
             }
 
-            // TODO: Apply parallelism
-            let f = File::open(path)?;
+            let f = File::open(path)?; // TODO: Warn and skip instead of fail
             match args.r#type {
                 Type::Alb => repl(BufReader::new(MultiGzDecoder::new(f)), ALBLogParser::new())?,
                 Type::ClassicLb => repl(BufReader::new(f), ClassicLBLogParser::new())?,
