@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Hyeon Kim <simnalamburt@gmail.com>"]
 description = "Simple AWS ELB log parser which parses Classic LB and ALB logs into JSONs."
 license = "AGPL-3.0-or-later"
+repository = "https://github.com/simnalamburt/elb-log-parser"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
