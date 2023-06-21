@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::io::{stdout, BufRead, BufWriter, Write};
+use std::io::{stdout, BufRead, Write};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -17,9 +17,7 @@ pub trait LBLogParser {
 pub fn repl<T: LBLogParser, R: BufRead>(mut reader: R, parser: T) -> anyhow::Result<()> {
     let mut buffer = Vec::new();
 
-    let stdout = stdout();
-    let stdout = stdout.lock();
-    let mut stdout = BufWriter::new(stdout);
+    let mut stdout = stdout().lock();
     while reader.read_until(b'\n', &mut buffer)? > 0 {
         {
             let log = parser.parse(&buffer)?;
