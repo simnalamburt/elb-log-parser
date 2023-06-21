@@ -88,8 +88,12 @@ pub struct LogParser {
     locs: RefCell<CaptureLocations>,
 }
 
-impl LogParser {
-    pub fn new() -> Self {
+impl LBLogParser for LogParser {
+    type Log<'input> = self::Log<'input>;
+    const EXT: &'static str = ".log.gz";
+    const TYPE: crate::Type = crate::Type::Alb;
+
+    fn new() -> Self {
         // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-log-entry-format
         let regex = Regex::new(
             r#"(?x)
@@ -183,10 +187,6 @@ impl LogParser {
 
         Self { regex, locs }
     }
-}
-
-impl LBLogParser for LogParser {
-    type Log<'input> = self::Log<'input>;
 
     fn parse<'input>(&self, log: &'input [u8]) -> Result<Log<'input>, ParseLogError> {
         let mut locs = self.locs.borrow_mut();

@@ -1,6 +1,7 @@
 use serde::Serialize;
-use std::io::{stdout, BufRead, Write};
 use thiserror::Error;
+
+use crate::Type;
 
 #[derive(Error, Debug)]
 pub enum ParseLogError {
@@ -8,24 +9,11 @@ pub enum ParseLogError {
     InvalidLogFormat(String),
 }
 
-pub trait LBLogParser {
+pub(crate) trait LBLogParser {
     type Log<'input>: Serialize;
+    const EXT: &'static str;
+    const TYPE: Type;
 
+    fn new() -> Self;
     fn parse<'input>(&self, log: &'input [u8]) -> Result<Self::Log<'input>, ParseLogError>;
-}
-
-pub fn repl<T: LBLogParser, R: BufRead>(mut reader: R, parser: T) -> anyhow::Result<()> {
-    let mut buffer = Vec::new();
-
-    let mut stdout = stdout().lock();
-    while reader.read_until(b'\n', &mut buffer)? > 0 {
-        {
-            let log = parser.parse(&buffer)?;
-            serde_json::to_writer(&mut stdout, &log)?;
-        }
-        stdout.write_all(b"\n")?;
-        buffer.clear();
-    }
-
-    Ok(())
 }
