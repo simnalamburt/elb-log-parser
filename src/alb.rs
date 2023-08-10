@@ -133,7 +133,7 @@ impl LBLogParser for LogParser {
                 \x20?                                               # MEMO: We've observed undocumented space character here in real world data
             "
             \x20
-            "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{2}(?:[0-9a-f]{6})?)*)"               # user agent
+            "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*)"         # user agent
             \x20
             ([0-9A-Z-_]+)                                           # ssl cipher
             \x20
@@ -284,6 +284,12 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"h2 2020-01-11T01:11:10.111111Z app/myalb/0123456789abcdef 1.123.123.123:12345 10.0.1.100:80 0.000 0.159 0.000 200 200 315 488 "GET https://example.com:443/very/good/route?some=pArameter12345&_=0123456788912 HTTP/2.0" "\x22Mozilla/5.0 (iPhone; CPU iPhone OS 11_4 like Mac OS X) available_resolution = 667,375 Apple Inc.~Apple A11 GPU\x22" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-3:012345678901:targetgroup/myalb/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" "example.com" "session-reused" 1 2020-01-11T01:11:10.111111Z "forward" "-" "-" "10.0.1.100:80" "200" "-" "-""#,
         r#"{"type":"h2","time":"2020-01-11T01:11:10.111111Z","elb":"app/myalb/0123456789abcdef","client_ip":"1.123.123.123","client_port":"12345","target_ip_port":"10.0.1.100:80","request_processing_time":"0.000","target_processing_time":"0.159","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"315","sent_bytes":"488","http_method":"GET","url":"https://example.com:443/very/good/route?some=pArameter12345&_=0123456788912","http_version":"HTTP/2.0","user_agent":"\\x22Mozilla/5.0 (iPhone; CPU iPhone OS 11_4 like Mac OS X) available_resolution = 667,375 Apple Inc.~Apple A11 GPU\\x22","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-3:012345678901:targetgroup/myalb/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"example.com","chosen_cert_arn":"session-reused","matched_rule_priority":"1","request_creation_time":"2020-01-11T01:11:10.111111Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.1.100:80","target_status_code_list":"200","classification":"-","classification_reason":"-"}"#
+    )?;
+
+    // We've observed that non-ASCII latin-1 sequences like "\xEC\x97\x90\xEC\x9D\xB4\xEC\xA0\x84\xED\x8A\xB8" do appear in user agents part
+    t(
+        br#"h2 2020-01-11T01:11:10.111111Z app/myalb/0123456789abcdef 1.123.123.123:12345 10.0.1.100:80 0.000 0.159 0.000 200 200 315 488 "GET https://example.com:443/very/good/route?some=pArameter12345&_=0123456788912 HTTP/2.0" "\xEC\x97\x90\xEC\x9D\xB4\xEC\xA0\x84\xED\x8A\xB8" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-3:012345678901:targetgroup/myalb/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" "example.com" "session-reused" 1 2020-01-11T01:11:10.111111Z "forward" "-" "-" "10.0.1.100:80" "200" "-" "-""#,
+        r#"{"type":"h2","time":"2020-01-11T01:11:10.111111Z","elb":"app/myalb/0123456789abcdef","client_ip":"1.123.123.123","client_port":"12345","target_ip_port":"10.0.1.100:80","request_processing_time":"0.000","target_processing_time":"0.159","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"315","sent_bytes":"488","http_method":"GET","url":"https://example.com:443/very/good/route?some=pArameter12345&_=0123456788912","http_version":"HTTP/2.0","user_agent":"\\xEC\\x97\\x90\\xEC\\x9D\\xB4\\xEC\\xA0\\x84\\xED\\x8A\\xB8","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-3:012345678901:targetgroup/myalb/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"example.com","chosen_cert_arn":"session-reused","matched_rule_priority":"1","request_creation_time":"2020-01-11T01:11:10.111111Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"10.0.1.100:80","target_status_code_list":"200","classification":"-","classification_reason":"-"}"#
     )?;
 
     t(
