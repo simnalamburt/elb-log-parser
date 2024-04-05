@@ -118,12 +118,41 @@ fn walkdir<T: LBLogParser>(path: &str) -> Result<()> {
                 }
 
                 match err.downcast_ref::<parse::ParseLogError>() {
-                    Some(parse::ParseLogError::InvalidLogFormat(log)) => eprintln!(
-                        "\x1b[93mThread panicked due to log parsing failure:\x1b[0m\n    {}\n",
-                        String::from_utf8_lossy(log)
-                    ),
+                    Some(parse::ParseLogError::InvalidLogFormat(log)) => {
+                        match T::try_find_failed_position(log) {
+                            None => {
+                                eprintln!(
+                                    "\
+\x1b[31mThread panicked due to log parsing failure:\x1b[0m
+    {}
+",
+                                    String::from_utf8_lossy(log).trim_end()
+                                );
+                            }
+                            Some(idx) if idx < log.len() => {
+                                eprintln!(
+                                    "\
+\x1b[31mThread panicked due to log parsing failure:\x1b[0m
+    {}\x1b[1;91;4;31m{}\x1b[0m\x1b[38;5;238m{}\x1b[0m
+",
+                                    String::from_utf8_lossy(&log[..idx]),
+                                    String::from_utf8_lossy(&log[idx..idx + 1]),
+                                    String::from_utf8_lossy(&log[idx + 1..]).trim_end(),
+                                );
+                            }
+                            Some(_) => {
+                                eprintln!(
+                                    "\
+\x1b[31mThread panicked due to log parsing failure:\x1b[0m
+    {} \x1b[91m(expected next input, but received none)\x1b[0m
+",
+                                    String::from_utf8_lossy(log).trim_end()
+                                );
+                            }
+                        }
+                    }
                     _ => eprintln!(
-                        "\x1b[93mThread panicked with following error:\x1b[0m {:?}",
+                        "\x1b[31mThread panicked with following error:\x1b[0m {:?}",
                         err
                     ),
                 }
