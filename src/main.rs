@@ -223,6 +223,7 @@ fn reporter<T: LBLogParser>(config: Config, err: &ParseLogError) {
             Some(idx) if idx < log.len() => eprintln!(
                 "{}\n    {}\x1b[1;91;4;31m{}\x1b[0m\x1b[38;5;238m{}\x1b[0m\n",
                 msg,
+                // TODO: Properly detect the border of grapheme clusters around 'idx'
                 String::from_utf8_lossy(&log[..idx]),
                 String::from_utf8_lossy(&log[idx..idx + 1]),
                 String::from_utf8_lossy(&log[idx + 1..]).trim_end(),
