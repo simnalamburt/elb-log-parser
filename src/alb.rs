@@ -117,9 +117,10 @@ impl LBLogParser for LogParser {
         "
             ([0-9A-Za-z-_]+)                                    # http method
             \x20
-            ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*)        # URL
+            ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*?)       # URL
             \x20
-            (-\x20?|HTTP/[0-9.]+)                               # http version
+            ((?:-|HTTP/[0-9.]+)?)                               # http version
+                                                                # MEMO: Contrary to the official document, we've observed that the HTTP version is sometimes missing in real world data
             \x20?                                               # MEMO: We've observed undocumented space character here in real world data
         "
         \x20
@@ -248,6 +249,11 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"http 2022-11-03T21:10:11.091427Z app/my-alb/1234567890abcdef 123.123.123.123:65432 - -1 -1 -1 400 - 0 272 "- http://example.com:8080- -" "-" - - - "-" "-" "-" - 2022-11-03T21:10:10.933000Z "-" "-" "-" "-" "-" "-" "-""#,
         r#"{"type":"http","time":"2022-11-03T21:10:11.091427Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"400","target_status_code":"-","received_bytes":"0","sent_bytes":"272","http_method":"-","url":"http://example.com:8080-","http_version":"-","user_agent":"-","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"-","trace_id":"-","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"-","request_creation_time":"2022-11-03T21:10:10.933000Z","actions_executed":"-","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#,
+    )?;
+
+    t(
+        br#"http 2022-11-03T21:10:11.091427Z app/my-alb/1234567890abcdef 123.123.123.123:65432 - -1 -1 -1 400 - 0 272 "- http://example.com:8080- " "-" - - - "-" "-" "-" - 2022-11-03T21:10:10.933000Z "-" "-" "-" "-" "-" "-" "-""#,
+        r#"{"type":"http","time":"2022-11-03T21:10:11.091427Z","elb":"app/my-alb/1234567890abcdef","client_ip":"123.123.123.123","client_port":"65432","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"400","target_status_code":"-","received_bytes":"0","sent_bytes":"272","http_method":"-","url":"http://example.com:8080-","http_version":"","user_agent":"-","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"-","trace_id":"-","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"-","request_creation_time":"2022-11-03T21:10:10.933000Z","actions_executed":"-","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#,
     )?;
 
     t(
