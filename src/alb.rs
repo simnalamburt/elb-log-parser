@@ -141,11 +141,16 @@ impl LBLogParser for LogParser {
         \x20
         ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # request_creation_time
         \x20
-        "([a-z-]*)"                                             # actions_executed
+        "(
+            (?:authenticate|fixed-response|forward|redirect|waf|waf-failed)
+            (?:,(?:authenticate|fixed-response|forward|redirect|waf|waf-failed))*
+            |
+            -
+        )"                                                      # actions_executed, https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#actions-taken
         \x20
         "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*|-)"             # redirect_url
         \x20
-        "([a-zA-Z]+|-)"                                         # error_reason
+        "([a-zA-Z]+|-)"                                         # error_reason, https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#error-reason-codes
         \x20
         "(
             (?:
@@ -167,7 +172,7 @@ impl LBLogParser for LogParser {
         \x20
         "(Acceptable|Ambiguous|Severe|-)"                       # classification
         \x20
-        "([a-zA-Z]+|-)"                                         # classification_reason
+        "([a-zA-Z]+|-)"                                         # classification_reason, https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#classification-reasons
         \x0A?
         $
     "#;
@@ -251,8 +256,8 @@ fn test_log_parser() -> Result<()> {
     )?;
 
     t(
-        br#"https 2022-11-02T16:16:31.662027Z app/myalb/0123456789012 123.123.123.123:54321 - -1 -1 -1 503 - 199 184 "GET https://10.100.10.100:443/ HTTP/1.1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 - "Root=1-abcdefgh-abcd-efgh-ijkl-0123456789" "*" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 0 2022-11-02T16:16:31.661000Z "fixed-response" "-" "-" "-" "-" "-" "-""#,
-        r#"{"type":"https","time":"2022-11-02T16:16:31.662027Z","elb":"app/myalb/0123456789012","client_ip":"123.123.123.123","client_port":"54321","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"503","target_status_code":"-","received_bytes":"199","sent_bytes":"184","http_method":"GET","url":"https://10.100.10.100:443/","http_version":"HTTP/1.1","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"-","trace_id":"Root=1-abcdefgh-abcd-efgh-ijkl-0123456789","domain_name":"*","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"0","request_creation_time":"2022-11-02T16:16:31.661000Z","actions_executed":"fixed-response","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
+        br#"https 2022-11-02T16:16:31.662027Z app/myalb/0123456789012 123.123.123.123:54321 - -1 -1 -1 503 - 199 184 "GET https://10.100.10.100:443/ HTTP/1.1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 - "Root=1-abcdefgh-abcd-efgh-ijkl-0123456789" "*" "arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 0 2022-11-02T16:16:31.661000Z "waf,fixed-response" "-" "-" "-" "-" "-" "-""#,
+        r#"{"type":"https","time":"2022-11-02T16:16:31.662027Z","elb":"app/myalb/0123456789012","client_ip":"123.123.123.123","client_port":"54321","target_ip_port":"-","request_processing_time":"-1","target_processing_time":"-1","response_processing_time":"-1","elb_status_code":"503","target_status_code":"-","received_bytes":"199","sent_bytes":"184","http_method":"GET","url":"https://10.100.10.100:443/","http_version":"HTTP/1.1","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"-","trace_id":"Root=1-abcdefgh-abcd-efgh-ijkl-0123456789","domain_name":"*","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:1234567890:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"0","request_creation_time":"2022-11-02T16:16:31.661000Z","actions_executed":"waf,fixed-response","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
     )?;
 
     t(
