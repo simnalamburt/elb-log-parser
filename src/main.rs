@@ -6,7 +6,7 @@ use std::fs::{metadata, File};
 use std::io::{stdin, stdout, BufRead, BufReader, Write};
 use std::thread;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use crossbeam_channel::{unbounded, Sender};
 use flate2::read::MultiGzDecoder;
@@ -130,11 +130,11 @@ fn walkdir<T: LBLogParser>(path: &str) -> Result<()> {
 
     // TODO: handle result
     if let Err(panic) = output_thread.join() {
-        return Err(anyhow::anyhow!("Thread panicked with error: {:?}", panic));
+        bail!("Thread panicked with error: {:?}", panic);
     }
     for thread in worker_threads {
         if let Err(panic) = thread.join() {
-            return Err(anyhow::anyhow!("Thread panicked with error: {:?}", panic));
+            bail!("Thread panicked with error: {:?}", panic);
         }
     }
 
