@@ -52,20 +52,25 @@ fn main() -> Result<()> {
             Type::ClassicLb => walkdir::<ClassicLBLogParser>(&args.path, args.config)?,
         }
     } else {
+        let stdin = stdin().lock();
+        let stdout = stdout().lock();
         match args.r#type {
-            Type::Alb => repl(ALBLogParser::new(), args.config)?,
-            Type::ClassicLb => repl(ClassicLBLogParser::new(), args.config)?,
+            Type::Alb => repl(stdin, stdout, ALBLogParser::new(), args.config)?,
+            Type::ClassicLb => repl(stdin, stdout, ClassicLBLogParser::new(), args.config)?,
         }
     }
 
     Ok(())
 }
 
-fn repl<T: LBLogParser>(parser: T, config: Config) -> Result<()> {
+fn repl<T: LBLogParser>(
+    mut reader: impl BufRead,
+    mut writer: impl Write,
+    parser: T,
+    config: Config
+) -> Result<()> {
     let mut buffer = Vec::new();
-    let mut stdin = stdin().lock();
-    let mut stdout = stdout().lock();
-    while stdin.read_until(b'\n', &mut buffer)? > 0 {
+    while reader.read_until(b'\n', &mut buffer)? > 0 {
         let result = parser.parse(&buffer);
         let log = match &result {
             Ok(log) => log,
@@ -84,9 +89,11 @@ fn repl<T: LBLogParser>(parser: T, config: Config) -> Result<()> {
                 continue;
             }
         };
-        serde_json::to_writer(&mut stdout, &log)?;
+
+        serde_json::to_writer(&mut writer, &log)?;
+        writer.write_all(b"\n")?;
+
         drop(result);
-        stdout.write_all(b"\n")?;
         buffer.clear();
     }
     Ok(())
@@ -124,11 +131,11 @@ fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
                     match T::TYPE {
                         Type::Alb => produce(
                             BufReader::new(MultiGzDecoder::new(f)),
-                            T::new(),
                             &tx,
+                            T::new(),
                             config,
                         )?,
-                        Type::ClassicLb => produce(BufReader::new(f), T::new(), &tx, config)?,
+                        Type::ClassicLb => produce(BufReader::new(f), &tx, T::new(), config)?,
                     }
                 }
                 Ok(())
@@ -170,8 +177,8 @@ fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
 
 fn produce<T: LBLogParser>(
     mut reader: impl BufRead,
-    parser: T,
     tx: &Sender<String>,
+    parser: T,
     config: Config,
 ) -> Result<()> {
     let mut buffer = Vec::new();
@@ -194,9 +201,11 @@ fn produce<T: LBLogParser>(
                 continue;
             }
         };
+
         let json = serde_json::to_string(&log)?;
-        drop(result);
         tx.send(json)?;
+
+        drop(result);
         buffer.clear();
     }
     Ok(())
