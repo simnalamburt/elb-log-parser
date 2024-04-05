@@ -5,8 +5,8 @@ use crate::Type;
 
 #[derive(Error, Debug)]
 pub enum ParseLogError {
-    #[error("Invalid log line: {0}")]
-    InvalidLogFormat(String),
+    #[error("Invalid log line: {}", String::from_utf8_lossy(.0))]
+    InvalidLogFormat(Vec<u8>),
 }
 
 pub(crate) trait LBLogParser {
