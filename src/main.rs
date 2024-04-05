@@ -3,7 +3,7 @@ mod classic_lb;
 mod parse;
 
 use std::fs::{metadata, File};
-use std::io::{stdin, stdout, BufRead, BufReader, Write};
+use std::io::{stderr, stdin, stdout, BufRead, BufReader, IsTerminal, Write};
 use std::thread;
 
 use anyhow::{bail, Result};
@@ -81,29 +81,54 @@ fn walkdir<T: LBLogParser>(path: &str) -> Result<()> {
             let r = r.clone();
             let tx = tx.clone();
             thread::spawn(move || -> Result<()> {
-                while let Ok(entry) = r.recv() {
-                    let path = entry.path();
+                let ret = || -> Result<()> {
+                    while let Ok(entry) = r.recv() {
+                        let path = entry.path();
 
-                    // ALB logs must ends with '.log.gz', and Classic LB logs must ends with '.log'
-                    if !path.to_str().map(|s| s.ends_with(T::EXT)).unwrap_or(false) {
-                        continue;
-                    }
-
-                    // Check for an empty file
-                    let metadata = metadata(path)?;
-                    if !metadata.is_file() || metadata.len() == 0 {
-                        continue;
-                    }
-
-                    let f = File::open(path)?;
-                    match T::TYPE {
-                        Type::Alb => {
-                            produce(BufReader::new(MultiGzDecoder::new(f)), T::new(), &tx)?
+                        // ALB logs must ends with '.log.gz', and Classic LB logs must ends with '.log'
+                        if !path.to_str().map(|s| s.ends_with(T::EXT)).unwrap_or(false) {
+                            continue;
                         }
-                        Type::ClassicLb => produce(BufReader::new(f), T::new(), &tx)?,
+
+                        // Check for an empty file
+                        let metadata = metadata(path)?;
+                        if !metadata.is_file() || metadata.len() == 0 {
+                            continue;
+                        }
+
+                        let f = File::open(path)?;
+                        match T::TYPE {
+                            Type::Alb => {
+                                produce(BufReader::new(MultiGzDecoder::new(f)), T::new(), &tx)?
+                            }
+                            Type::ClassicLb => produce(BufReader::new(f), T::new(), &tx)?,
+                        }
                     }
+                    Ok(())
+                }();
+
+                //
+                // Error handling
+                //
+                let Err(err) = &ret else { return Ok(()) };
+
+                if !stderr().is_terminal() {
+                    eprintln!("Thread panicked with following error: {:?}", err);
+                    return ret;
                 }
-                Ok(())
+
+                match err.downcast_ref::<parse::ParseLogError>() {
+                    Some(parse::ParseLogError::InvalidLogFormat(log)) => eprintln!(
+                        "\x1b[93mThread panicked due to log parsing failure:\x1b[0m\n    {}\n",
+                        String::from_utf8_lossy(log)
+                    ),
+                    _ => eprintln!(
+                        "\x1b[93mThread panicked with following error:\x1b[0m {:?}",
+                        err
+                    ),
+                }
+
+                ret
             })
         })
         .collect();
