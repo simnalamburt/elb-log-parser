@@ -18,6 +18,27 @@ pub(crate) trait LBLogParser {
 
     fn new() -> Self;
     fn parse<'input>(&self, log: &'input [u8]) -> Result<Self::Log<'input>, ParseLogError>;
+
+    fn try_find_failed_position(log: &[u8]) -> Option<usize> {
+        use regex_automata::dfa::{dense::DFA, Automaton};
+        use regex_automata::Input;
+
+        let dfa = DFA::new(Self::REGEX).unwrap();
+        let mut s = dfa.start_state_forward(&Input::new(log)).unwrap();
+
+        for (idx, &byte) in log.iter().enumerate() {
+            s = dfa.next_state(s, byte);
+            if dfa.is_dead_state(s) {
+                return Some(idx);
+            }
+        }
+        s = dfa.next_eoi_state(s);
+        if dfa.is_dead_state(s) {
+            return Some(log.len());
+        }
+
+        None
+    }
 }
 
 pub(crate) fn bytes_ser<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>

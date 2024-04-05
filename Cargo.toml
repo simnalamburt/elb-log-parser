@@ -11,6 +11,7 @@ repository = "https://github.com/simnalamburt/elb-log-parser"
 
 [dependencies]
 regex = "1"
+regex-automata = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 walkdir = "2"

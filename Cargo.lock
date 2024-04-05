@@ -189,6 +189,7 @@ dependencies = [
  "crossbeam-channel",
  "flate2",
  "regex",
+ "regex-automata",
  "serde",
  "serde_json",
  "thiserror",
