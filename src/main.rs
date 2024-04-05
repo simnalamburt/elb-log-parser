@@ -8,7 +8,7 @@ use std::thread;
 
 use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
-use crossbeam_channel::{unbounded, Sender};
+use crossbeam_channel::unbounded;
 use flate2::read::MultiGzDecoder;
 use walkdir::{DirEntry, WalkDir};
 
@@ -45,58 +45,25 @@ struct Config {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-
-    if args.path != "-" {
-        match args.r#type {
-            Type::Alb => walkdir::<ALBLogParser>(&args.path, args.config)?,
-            Type::ClassicLb => walkdir::<ClassicLBLogParser>(&args.path, args.config)?,
-        }
-    } else {
-        let stdin = stdin().lock();
-        let stdout = stdout().lock();
-        match args.r#type {
-            Type::Alb => repl(stdin, stdout, ALBLogParser::new(), args.config)?,
-            Type::ClassicLb => repl(stdin, stdout, ClassicLBLogParser::new(), args.config)?,
-        }
+    match args.r#type {
+        Type::Alb => main_of::<ALBLogParser>(args)?,
+        Type::ClassicLb => main_of::<ClassicLBLogParser>(args)?,
     }
-
     Ok(())
 }
 
-fn repl<T: LBLogParser>(
-    mut reader: impl BufRead,
-    mut writer: impl Write,
-    parser: T,
-    config: Config
-) -> Result<()> {
-    let mut buffer = Vec::new();
-    while reader.read_until(b'\n', &mut buffer)? > 0 {
-        let result = parser.parse(&buffer);
-        let log = match &result {
-            Ok(log) => log,
-
-            //
-            // Error handling
-            //
-            Err(err) => {
-                reporter::<T>(config, err);
-
-                if !config.skip_parse_errors {
-                    return Err(err.clone().into());
-                }
-                drop(result);
-                buffer.clear();
-                continue;
-            }
-        };
-
-        serde_json::to_writer(&mut writer, &log)?;
-        writer.write_all(b"\n")?;
-
-        drop(result);
-        buffer.clear();
+fn main_of<T: LBLogParser>(args: Args) -> Result<()> {
+    if args.path != "-" {
+        walkdir::<T>(&args.path, args.config)
+    } else {
+        let stdin = stdin().lock();
+        let mut stdout = stdout().lock();
+        for_each_parsed_lines::<T>(stdin, args.config, |log| {
+            serde_json::to_writer(&mut stdout, log)?;
+            stdout.write_all(b"\n")?;
+            Ok(())
+        })
     }
-    Ok(())
 }
 
 fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
@@ -127,16 +94,16 @@ fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
                         continue;
                     }
 
-                    let f = File::open(path)?;
-                    match T::TYPE {
-                        Type::Alb => produce(
-                            BufReader::new(MultiGzDecoder::new(f)),
-                            &tx,
-                            T::new(),
-                            config,
-                        )?,
-                        Type::ClassicLb => produce(BufReader::new(f), &tx, T::new(), config)?,
-                    }
+                    let file = File::open(path)?;
+                    let reader: Box<dyn BufRead> = match T::TYPE {
+                        Type::Alb => Box::new(BufReader::new(MultiGzDecoder::new(file))),
+                        Type::ClassicLb => Box::new(BufReader::new(file)),
+                    };
+                    for_each_parsed_lines::<T>(reader, config, |log| {
+                        let json = serde_json::to_string(&log)?;
+                        tx.send(json)?;
+                        Ok(())
+                    })?;
                 }
                 Ok(())
             })
@@ -175,12 +142,12 @@ fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
     Ok(())
 }
 
-fn produce<T: LBLogParser>(
+fn for_each_parsed_lines<T: LBLogParser>(
     mut reader: impl BufRead,
-    tx: &Sender<String>,
-    parser: T,
     config: Config,
+    mut callback: impl FnMut(&T::Log<'_>) -> Result<()>,
 ) -> Result<()> {
+    let parser = T::new();
     let mut buffer = Vec::new();
     while reader.read_until(b'\n', &mut buffer)? > 0 {
         let result = parser.parse(&buffer);
@@ -202,8 +169,7 @@ fn produce<T: LBLogParser>(
             }
         };
 
-        let json = serde_json::to_string(&log)?;
-        tx.send(json)?;
+        callback(log)?;
 
         drop(result);
         buffer.clear();
