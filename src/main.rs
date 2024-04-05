@@ -64,37 +64,28 @@ fn main() -> Result<()> {
 }
 
 fn repl<T: LBLogParser>(
-    mut reader: impl BufRead,
+    reader: impl BufRead,
     mut writer: impl Write,
     parser: T,
-    config: Config
+    config: Config,
 ) -> Result<()> {
-    let mut buffer = Vec::new();
-    while reader.read_until(b'\n', &mut buffer)? > 0 {
-        let result = parser.parse(&buffer);
-        let log = match &result {
+    for slice in reader.split(b'\n') {
+        let buffer = slice?;
+        let log = match parser.parse(&buffer) {
             Ok(log) => log,
 
-            //
             // Error handling
-            //
             Err(err) => {
-                reporter::<T>(config, err);
-
-                if !config.skip_parse_errors {
-                    return Err(err.clone().into());
+                reporter::<T>(config, &err);
+                if config.skip_parse_errors {
+                    continue;
                 }
-                drop(result);
-                buffer.clear();
-                continue;
+                return Err(err.clone().into());
             }
         };
 
         serde_json::to_writer(&mut writer, &log)?;
         writer.write_all(b"\n")?;
-
-        drop(result);
-        buffer.clear();
     }
     Ok(())
 }
@@ -176,37 +167,28 @@ fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
 }
 
 fn produce<T: LBLogParser>(
-    mut reader: impl BufRead,
+    reader: impl BufRead,
     tx: &Sender<String>,
     parser: T,
     config: Config,
 ) -> Result<()> {
-    let mut buffer = Vec::new();
-    while reader.read_until(b'\n', &mut buffer)? > 0 {
-        let result = parser.parse(&buffer);
-        let log = match &result {
+    for slice in reader.split(b'\n') {
+        let buffer = slice?;
+        let log = match parser.parse(&buffer) {
             Ok(log) => log,
 
-            //
             // Error handling
-            //
             Err(err) => {
-                reporter::<T>(config, err);
-
-                if !config.skip_parse_errors {
-                    return Err(err.clone().into());
+                reporter::<T>(config, &err);
+                if config.skip_parse_errors {
+                    continue;
                 }
-                drop(result);
-                buffer.clear();
-                continue;
+                return Err(err.clone().into());
             }
         };
 
         let json = serde_json::to_string(&log)?;
         tx.send(json)?;
-
-        drop(result);
-        buffer.clear();
     }
     Ok(())
 }
