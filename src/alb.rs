@@ -2,18 +2,9 @@ use std::cell::RefCell;
 
 use anyhow::Result;
 use regex::bytes::{CaptureLocations, Regex};
-use serde::{ser, Serialize, Serializer};
+use serde::Serialize;
 
-use crate::parse::{LBLogParser, ParseLogError};
-
-fn bytes_ser<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let str = std::str::from_utf8(bytes)
-        .map_err(|_| ser::Error::custom("log contains invalid UTF-8 characters"))?;
-    serializer.serialize_str(str)
-}
+use crate::parse::{bytes_ser, LBLogParser, ParseLogError};
 
 #[derive(Serialize)]
 pub struct Log<'a> {
@@ -90,101 +81,100 @@ pub struct LogParser {
 
 impl LBLogParser for LogParser {
     type Log<'input> = self::Log<'input>;
+
     const EXT: &'static str = ".log.gz";
     const TYPE: crate::Type = crate::Type::Alb;
 
-    fn new() -> Self {
-        // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-log-entry-format
-        let regex = Regex::new(
-            r#"(?x)
-            ^
-            (http|https|h2|grpcs|ws|wss)                            # type
+    // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-log-entry-format
+    const REGEX: &'static str = r#"(?x)
+        ^
+        (http|https|h2|grpcs|ws|wss)                            # type
+        \x20
+        ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
+        \x20
+        ([a-zA-Z0-9](?:[/a-zA-Z0-9-]*[a-zA-Z0-9])?)             # elb
+        \x20
+        ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})        # client ip
+        :
+        ([0-9]{1,5})                                            # client port
+        \x20
+        ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}|-)   # target ip port
+        \x20
+        ([0-9]+\.[0-9]+|-1)                                     # request processing time
+        \x20
+        ([0-9]+\.[0-9]+|-1)                                     # target processing time
+        \x20
+        ([0-9]+\.[0-9]+|-1)                                     # response processing time
+        \x20
+        ([0-9]{3}|-)                                            # elb status code
+        \x20
+        ([0-9]{3}|-)                                            # target status code
+        \x20
+        ([0-9]+)                                                # received bytes
+        \x20
+        ([0-9]+)                                                # sent bytes
+        \x20
+        "
+            ([0-9A-Za-z-_]+)                                    # http method
             \x20
-            ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
+            ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*)        # URL
             \x20
-            ([a-zA-Z0-9](?:[/a-zA-Z0-9-]*[a-zA-Z0-9])?)             # elb
-            \x20
-            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})        # client ip
-            :
-            ([0-9]{1,5})                                            # client port
-            \x20
-            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}|-)   # target ip port
-            \x20
-            ([0-9]+\.[0-9]+|-1)                                     # request processing time
-            \x20
-            ([0-9]+\.[0-9]+|-1)                                     # target processing time
-            \x20
-            ([0-9]+\.[0-9]+|-1)                                     # response processing time
-            \x20
-            ([0-9]{3}|-)                                            # elb status code
-            \x20
-            ([0-9]{3}|-)                                            # target status code
-            \x20
-            ([0-9]+)                                                # received bytes
-            \x20
-            ([0-9]+)                                                # sent bytes
-            \x20
-            "
-                ([0-9A-Za-z-_]+)                                    # http method
-                \x20
-                ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*)        # URL
-                \x20
-                (-\x20?|HTTP/[0-9.]+)                               # http version
-                \x20?                                               # MEMO: We've observed undocumented space character here in real world data
-            "
-            \x20
-            "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*)"         # user agent
-            \x20
-            ([0-9A-Z-_]+)                                           # ssl cipher
-            \x20
-            (TLSv[0-9.]+|-)                                         # ssl protocol
-            \x20
-            (arn:[^\x20]*|-)                                        # target_group_arn
-            \x20
-            "((?:[^\\"]|\\")*)"                                     # trace_id
-            \x20
-            "\x20?([0-9A-Za-z.\-\*:]*)"                             # domain_name
-            \x20
-            "(arn:(?:[^\\"]|\\")*|session-reused|-)"                # chosen_cert_arn
-            \x20
-            ([0-9]{1,5}|-1|-)                                       # matched_rule_priority
-            \x20
-            ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # request_creation_time
-            \x20
-            "([a-z-]*)"                                             # actions_executed
-            \x20
-            "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*|-)"             # redirect_url
-            \x20
-            "([a-zA-Z]+|-)"                                         # error_reason
-            \x20
-            "(
-                (?:
-                    [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}
-                    (?:\x20[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5})*
-                )
-                |
-                -
-            )"                                                      # target_ip_port_list
-            \x20
-            "(
-                (?:
-                    [0-9]{3}
-                    (?:\x20[0-9]{3})*
-                )
-                |
-                -
-            )"                                                      # target_status_code_list
-            \x20
-            "(Acceptable|Ambiguous|Severe|-)"                       # classification
-            \x20
-            "([a-zA-Z]+|-)"                                         # classification_reason
-            \x0A?
-            $
-        "#,
-        )
-        .unwrap();
-        let locs = RefCell::new(regex.capture_locations());
+            (-\x20?|HTTP/[0-9.]+)                               # http version
+            \x20?                                               # MEMO: We've observed undocumented space character here in real world data
+        "
+        \x20
+        "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*)"         # user agent
+        \x20
+        ([0-9A-Z-_]+)                                           # ssl cipher
+        \x20
+        (TLSv[0-9.]+|-)                                         # ssl protocol
+        \x20
+        (arn:[^\x20]*|-)                                        # target_group_arn
+        \x20
+        "((?:[^\\"]|\\")*)"                                     # trace_id
+        \x20
+        "\x20?([0-9A-Za-z.\-\*:]*)"                             # domain_name
+        \x20
+        "(arn:(?:[^\\"]|\\")*|session-reused|-)"                # chosen_cert_arn
+        \x20
+        ([0-9]{1,5}|-1|-)                                       # matched_rule_priority
+        \x20
+        ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # request_creation_time
+        \x20
+        "([a-z-]*)"                                             # actions_executed
+        \x20
+        "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*|-)"             # redirect_url
+        \x20
+        "([a-zA-Z]+|-)"                                         # error_reason
+        \x20
+        "(
+            (?:
+                [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}
+                (?:\x20[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5})*
+            )
+            |
+            -
+        )"                                                      # target_ip_port_list
+        \x20
+        "(
+            (?:
+                [0-9]{3}
+                (?:\x20[0-9]{3})*
+            )
+            |
+            -
+        )"                                                      # target_status_code_list
+        \x20
+        "(Acceptable|Ambiguous|Severe|-)"                       # classification
+        \x20
+        "([a-zA-Z]+|-)"                                         # classification_reason
+        \x0A?
+        $
+    "#;
 
+    fn new() -> Self {
+        let regex = Regex::new(Self::REGEX).unwrap();
+        let locs = RefCell::new(regex.capture_locations());
         Self { regex, locs }
     }
 

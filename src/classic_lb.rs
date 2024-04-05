@@ -2,18 +2,9 @@ use std::cell::RefCell;
 
 use anyhow::Result;
 use regex::bytes::{CaptureLocations, Regex};
-use serde::{ser, Serialize, Serializer};
+use serde::Serialize;
 
-use crate::parse::{LBLogParser, ParseLogError};
-
-fn bytes_ser<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let str = std::str::from_utf8(bytes)
-        .map_err(|_| ser::Error::custom("log contains invalid UTF-8 characters"))?;
-    serializer.serialize_str(str)
-}
+use crate::parse::{bytes_ser, LBLogParser, ParseLogError};
 
 #[derive(Serialize)]
 pub struct Log<'a> {
@@ -62,58 +53,57 @@ pub struct LogParser {
 
 impl LBLogParser for LogParser {
     type Log<'input> = self::Log<'input>;
+
     const EXT: &'static str = ".log";
     const TYPE: crate::Type = crate::Type::ClassicLb;
 
-    fn new() -> Self {
-        // https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
-        let regex = Regex::new(
-            r#"(?x)
-            ^
-            ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
+    // https://docs.aws.amazon.com/en_us/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-syntax
+    const REGEX: &'static str = r#"(?x)
+        ^
+        ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}Z)   # time
+        \x20
+        ([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)          # elb
+        \x20
+        ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})    # client ip
+        :
+        ([0-9]{1,5})                                        # client port
+        \x20
+        ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}|-)   # backend ip port
+        \x20
+        ([0-9]+\.[0-9]+|-1)                                 # request processing time
+        \x20
+        ([0-9]+\.[0-9]+|-1)                                 # backend processing time
+        \x20
+        ([0-9]+\.[0-9]+|-1)                                 # response processing time
+        \x20
+        ([0-9]{3}|-)                                        # elb status code
+        \x20
+        ([0-9]{1,3}|-)                                      # backend status code
+        \x20
+        ([0-9]+)                                            # received bytes
+        \x20
+        ([0-9]+)                                            # sent bytes
+        \x20
+        "
+            (-|[A-Z]+)                                      # http method
             \x20
-            ([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)          # elb
+            ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)         # URL
             \x20
-            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})    # client ip
-            :
-            ([0-9]{1,5})                                        # client port
-            \x20
-            ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{1,5}|-)   # backend ip port
-            \x20
-            ([0-9]+\.[0-9]+|-1)                                 # request processing time
-            \x20
-            ([0-9]+\.[0-9]+|-1)                                 # backend processing time
-            \x20
-            ([0-9]+\.[0-9]+|-1)                                 # response processing time
-            \x20
-            ([0-9]{3}|-)                                        # elb status code
-            \x20
-            ([0-9]{1,3}|-)                                      # backend status code
-            \x20
-            ([0-9]+)                                            # received bytes
-            \x20
-            ([0-9]+)                                            # sent bytes
-            \x20
-            "
-                (-|[A-Z]+)                                      # http method
-                \x20
-                ((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)         # URL
-                \x20
-                (-\x20|HTTP/[0-9.]+)                            # http version
-            "
-            \x20
-            "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)"           # user agent
-            \x20
-            ([0-9A-Z-]+)                                        # ssl cipher
-            \x20
-            (TLSv[0-9.]+|-)                                     # ssl protocol
-            \x0A?
-            $
-        "#,
-        )
-        .unwrap();
-        let locs = RefCell::new(regex.capture_locations());
+            (-\x20|HTTP/[0-9.]+)                            # http version
+        "
+        \x20
+        "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-f]{8})*)"           # user agent
+        \x20
+        ([0-9A-Z-]+)                                        # ssl cipher
+        \x20
+        (TLSv[0-9.]+|-)                                     # ssl protocol
+        \x0A?
+        $
+    "#;
 
+    fn new() -> Self {
+        let regex = Regex::new(Self::REGEX).unwrap();
+        let locs = RefCell::new(regex.capture_locations());
         Self { regex, locs }
     }
 
