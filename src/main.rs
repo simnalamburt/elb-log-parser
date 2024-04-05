@@ -168,8 +168,8 @@ fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
     Ok(())
 }
 
-fn produce<T: LBLogParser, R: BufRead>(
-    mut reader: R,
+fn produce<T: LBLogParser>(
+    mut reader: impl BufRead,
     parser: T,
     tx: &Sender<String>,
     config: Config,
