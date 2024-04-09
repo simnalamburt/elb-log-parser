@@ -134,7 +134,7 @@ impl LBLogParser for LogParser {
         \x20
         "((?:[^\\"]|\\")*)"                                     # trace_id
         \x20
-        "\x20?([0-9A-Za-z.\-\*:]*)"                             # domain_name
+        "\x20?([0-9A-Za-z.\-\*:_]*)"                            # domain_name
         \x20
         "(arn:(?:[^\\"]|\\")*|session-reused|-)"                # chosen_cert_arn
         \x20
@@ -146,7 +146,7 @@ impl LBLogParser for LogParser {
             (?:authenticate|fixed-response|forward|redirect|waf|waf-failed)
             (?:,(?:authenticate|fixed-response|forward|redirect|waf|waf-failed))*
             |
-            -
+            -?                                                  # MEMO: We've observed undocumented empty actions_executed in real world data
         )"                                                      # actions_executed, https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#actions-taken
         \x20
         "((?:[^\n\\"]|\\"|\\\\|\\x[0-9a-fA-F]{2}(?:[0-9a-fA-F]{6})?)*|-)"             # redirect_url
@@ -299,8 +299,8 @@ fn test_log_parser() -> Result<()> {
     )?;
 
     t(
-        br#"https 2023-06-01T12:34:56.123456Z app/myalb/0123456789abcdef 123.123.123.123:12345 10.0.12.34:80 0.001 0.002 0.003 200 200 123 456 "GET https://example.com/ HTTP/2.0" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" " some-subdomain.domain.com" "arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 0 2023-05-02T22:52:38.170000Z "forward" "-" "-" "-" "-" "-" "-""#,
-        r#"{"type":"https","time":"2023-06-01T12:34:56.123456Z","elb":"app/myalb/0123456789abcdef","client_ip":"123.123.123.123","client_port":"12345","target_ip_port":"10.0.12.34:80","request_processing_time":"0.001","target_processing_time":"0.002","response_processing_time":"0.003","elb_status_code":"200","target_status_code":"200","received_bytes":"123","sent_bytes":"456","http_method":"GET","url":"https://example.com/","http_version":"HTTP/2.0","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"some-subdomain.domain.com","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"0","request_creation_time":"2023-05-02T22:52:38.170000Z","actions_executed":"forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
+        br#"https 2023-06-01T12:34:56.123456Z app/myalb/0123456789abcdef 123.123.123.123:12345 10.0.12.34:80 0.001 0.002 0.003 200 200 123 456 "GET https://_test.example.com/ HTTP/2.0" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" " some-subdomain.domain.com" "arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 0 2023-05-02T22:52:38.170000Z "" "-" "-" "-" "-" "-" "-""#,
+        r#"{"type":"https","time":"2023-06-01T12:34:56.123456Z","elb":"app/myalb/0123456789abcdef","client_ip":"123.123.123.123","client_port":"12345","target_ip_port":"10.0.12.34:80","request_processing_time":"0.001","target_processing_time":"0.002","response_processing_time":"0.003","elb_status_code":"200","target_status_code":"200","received_bytes":"123","sent_bytes":"456","http_method":"GET","url":"https://_test.example.com/","http_version":"HTTP/2.0","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"some-subdomain.domain.com","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"0","request_creation_time":"2023-05-02T22:52:38.170000Z","actions_executed":"","redirect_url":"-","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
     )?;
 
     t(
