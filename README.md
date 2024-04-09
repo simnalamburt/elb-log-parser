@@ -13,9 +13,10 @@ Arguments:
   <PATH>  Path of directory containing load balancer logs. To read from stdin, use "-"
 
 Options:
-  -t, --type <TYPE>  Type of load balancer [default: alb] [possible values: alb, classic-lb]
-  -h, --help         Print help
-  -V, --version      Print version
+  -t, --type <TYPE>        Type of load balancer [default: alb] [possible values: alb, classic-lb]
+      --skip-parse-errors  Skip parsing errors
+  -h, --help               Print help
+  -V, --version            Print version
 ```
 
 Usage example:
