@@ -1,6 +1,6 @@
 [package]
 name = "elb-log-parser"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 authors = ["Hyeon Kim <simnalamburt@gmail.com>"]
 description = "Simple AWS ELB log parser which parses Classic LB and ALB logs into JSONs."
