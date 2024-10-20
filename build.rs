@@ -1,4 +1,4 @@
-use std::fs;
+use std::env;
 use std::path::PathBuf;
 
 use clap::CommandFactory;
@@ -11,11 +11,8 @@ use clap_complete::{
 include!("src/cli.rs");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     let mut cmd = Args::command();
-
-    // mkdir -p completions
-    let out_dir = PathBuf::from("completions");
-    fs::create_dir_all(&out_dir)?;
 
     generate_to(Bash, &mut cmd, env!("CARGO_PKG_NAME"), &out_dir)?;
     generate_to(Zsh, &mut cmd, env!("CARGO_PKG_NAME"), &out_dir)?;
