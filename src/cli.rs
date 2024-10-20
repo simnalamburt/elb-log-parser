@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{builder::ValueHint, Parser, ValueEnum};
 
 #[derive(Parser)]
 #[command(about, version, arg_required_else_help(true))]
@@ -11,6 +11,7 @@ pub struct Args {
     pub config: Config,
 
     /// Path of directory containing load balancer logs. To read from stdin, use "-".
+    #[arg(value_hint = ValueHint::DirPath, allow_hyphen_values = true)]
     pub path: String,
 }
 
