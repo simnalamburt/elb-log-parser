@@ -1,6 +1,5 @@
 mod alb;
 mod classic_lb;
-mod cli;
 mod parse;
 
 use std::fs::{metadata, File};
@@ -8,15 +7,41 @@ use std::io::{stderr, stdin, stdout, BufRead, BufReader, IsTerminal, Write};
 use std::thread;
 
 use anyhow::{bail, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use crossbeam_channel::unbounded;
 use flate2::read::MultiGzDecoder;
 use walkdir::{DirEntry, WalkDir};
 
-use alb::LogParser as ALBLogParser;
-use classic_lb::LogParser as ClassicLBLogParser;
-use cli::{Args, Config, Type};
-use parse::{LBLogParser, ParseLogError};
+use crate::alb::LogParser as ALBLogParser;
+use crate::classic_lb::LogParser as ClassicLBLogParser;
+use crate::parse::{LBLogParser, ParseLogError};
+
+#[derive(Parser)]
+#[command(about, version, arg_required_else_help(true))]
+struct Args {
+    /// Type of load balancer.
+    #[arg(value_enum, short, long, default_value_t = Type::Alb)]
+    r#type: Type,
+
+    #[command(flatten)]
+    config: Config,
+
+    /// Path of directory containing load balancer logs. To read from stdin, use "-".
+    path: String,
+}
+
+#[derive(ValueEnum, Clone)]
+enum Type {
+    Alb,
+    ClassicLb,
+}
+
+#[derive(Parser, Clone, Copy)]
+struct Config {
+    /// Skip parsing errors.
+    #[arg(long)]
+    skip_parse_errors: bool,
+}
 
 fn main() -> Result<()> {
     let args = Args::parse();
