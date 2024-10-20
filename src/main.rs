@@ -7,7 +7,8 @@ use std::io::{stderr, stdin, stdout, BufRead, BufReader, IsTerminal, Write};
 use std::thread;
 
 use anyhow::{bail, Result};
-use clap::{Parser, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::{generate, Shell};
 use crossbeam_channel::unbounded;
 use flate2::read::MultiGzDecoder;
 use walkdir::{DirEntry, WalkDir};
@@ -17,7 +18,12 @@ use crate::classic_lb::LogParser as ClassicLBLogParser;
 use crate::parse::{LBLogParser, ParseLogError};
 
 #[derive(Parser)]
-#[command(about, version, arg_required_else_help(true))]
+#[command(
+    about,
+    version,
+    arg_required_else_help = true,
+    args_conflicts_with_subcommands = true
+)]
 struct Args {
     /// Type of load balancer.
     #[arg(value_enum, short, long, default_value_t = Type::Alb)]
@@ -27,7 +33,12 @@ struct Args {
     config: Config,
 
     /// Path of directory containing load balancer logs. To read from stdin, use "-".
-    path: String,
+    #[arg(required = true)]
+    path: Option<String>,
+
+    /// Subcommands
+    #[command(subcommand)]
+    command: Option<Commands>,
 }
 
 #[derive(ValueEnum, Clone)]
@@ -43,22 +54,45 @@ struct Config {
     skip_parse_errors: bool,
 }
 
+#[derive(Subcommand)]
+enum Commands {
+    /// Generate shell completion script for specified shell
+    #[command(arg_required_else_help = true)]
+    Completion {
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    // Handle shell completion
+    if let Some(Commands::Completion { shell }) = args.command {
+        let mut cmd = Args::command();
+        let bin_name = env!("CARGO_PKG_NAME");
+        generate(shell, &mut cmd, bin_name, &mut stdout());
+        return Ok(());
+    }
+
+    // Otherwise, args.path must exist
+    let Some(path) = args.path else {
+        unreachable!()
+    };
     match args.r#type {
-        Type::Alb => main_of::<ALBLogParser>(args)?,
-        Type::ClassicLb => main_of::<ClassicLBLogParser>(args)?,
+        Type::Alb => main_of::<ALBLogParser>(&path, args.config)?,
+        Type::ClassicLb => main_of::<ClassicLBLogParser>(&path, args.config)?,
     }
     Ok(())
 }
 
-fn main_of<T: LBLogParser>(args: Args) -> Result<()> {
-    if args.path != "-" {
-        walkdir::<T>(&args.path, args.config)
+fn main_of<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
+    if path != "-" {
+        walkdir::<T>(path, config)
     } else {
         let stdin = stdin().lock();
         let mut stdout = stdout().lock();
-        for_each_parsed_lines::<T>(stdin, args.config, |log| {
+        for_each_parsed_lines::<T>(stdin, config, |log| {
             serde_json::to_writer(&mut stdout, log)?;
             stdout.write_all(b"\n")?;
             Ok(())

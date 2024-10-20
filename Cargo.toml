@@ -20,4 +20,5 @@ flate2 = "1"
 anyhow = { version = "1", features = ["backtrace"] }
 thiserror = "1"
 clap = { version = "4.0.22", features = ["derive"] }
+clap_complete = "4.5.33"
 crossbeam-channel = "0.5.8"
