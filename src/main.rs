@@ -7,7 +7,7 @@ use std::io::{stderr, stdin, stdout, BufRead, BufReader, IsTerminal, Write};
 use std::thread;
 
 use anyhow::{bail, Result};
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap::{builder::ValueHint, CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
 use crossbeam_channel::unbounded;
 use flate2::read::MultiGzDecoder;
@@ -33,7 +33,7 @@ struct Args {
     config: Config,
 
     /// Path of directory containing load balancer logs. To read from stdin, use "-".
-    #[arg(required = true)]
+    #[arg(required = true, value_hint = ValueHint::DirPath, allow_hyphen_values = true)]
     path: Option<String>,
 
     /// Subcommands
