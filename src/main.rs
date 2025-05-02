@@ -2,13 +2,13 @@ mod alb;
 mod classic_lb;
 mod parse;
 
-use std::fs::{metadata, File};
-use std::io::{stderr, stdin, stdout, BufRead, BufReader, IsTerminal, Write};
+use std::fs::{File, metadata};
+use std::io::{BufRead, BufReader, IsTerminal, Write, stderr, stdin, stdout};
 use std::thread;
 
-use anyhow::{bail, Result};
-use clap::{builder::ValueHint, CommandFactory, Parser, Subcommand, ValueEnum};
-use clap_complete::{generate, Shell};
+use anyhow::{Result, bail};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum, builder::ValueHint};
+use clap_complete::{Shell, generate};
 use crossbeam_channel::unbounded;
 use flate2::read::MultiGzDecoder;
 use walkdir::{DirEntry, WalkDir};

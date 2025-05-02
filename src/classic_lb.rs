@@ -4,7 +4,7 @@ use anyhow::Result;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::Serialize;
 
-use crate::parse::{bytes_ser, LBLogParser, ParseLogError};
+use crate::parse::{LBLogParser, ParseLogError, bytes_ser};
 
 #[derive(Serialize)]
 pub struct Log<'a> {

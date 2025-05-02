@@ -1,4 +1,4 @@
-use serde::{ser, Serialize, Serializer};
+use serde::{Serialize, Serializer, ser};
 use thiserror::Error;
 
 use crate::Type;
@@ -20,8 +20,8 @@ pub(crate) trait LBLogParser {
     fn parse<'input>(&self, log: &'input [u8]) -> Result<Self::Log<'input>, ParseLogError>;
 
     fn try_find_failed_position(log: &[u8]) -> Option<usize> {
-        use regex_automata::dfa::{dense::DFA, Automaton};
         use regex_automata::Input;
+        use regex_automata::dfa::{Automaton, dense::DFA};
 
         let dfa = DFA::new(Self::REGEX).unwrap();
         let mut s = dfa.start_state_forward(&Input::new(log)).unwrap();
