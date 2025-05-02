@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::Serialize;
 
-use crate::parse::{LBLogParser, ParseLogError, bytes_ser, optional_bytes_ser};
+use crate::parse::{LBLogParser, LBType, ParseLogError, bytes_ser, optional_bytes_ser};
 
 #[derive(Serialize)]
 pub struct Log<'a> {
@@ -94,7 +94,7 @@ impl LBLogParser for LogParser {
     type Log<'input> = self::Log<'input>;
 
     const EXT: &'static str = ".log.gz";
-    const TYPE: crate::Type = crate::Type::Alb;
+    const TYPE: LBType = LBType::Alb;
 
     // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-log-entry-format
     const REGEX: &'static str = r#"(?x)

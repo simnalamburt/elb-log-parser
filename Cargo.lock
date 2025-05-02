@@ -194,11 +194,8 @@ dependencies = [
  "clap_complete",
  "crossbeam-channel",
  "flate2",
- "regex",
- "regex-automata",
- "serde",
+ "libelb-log-parser",
  "serde_json",
- "thiserror",
  "walkdir",
 ]
 
@@ -241,6 +238,17 @@ name = "libc"
 version = "0.2.172"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
+
+[[package]]
+name = "libelb-log-parser"
+version = "0.0.0"
+dependencies = [
+ "regex",
+ "regex-automata",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "memchr"
