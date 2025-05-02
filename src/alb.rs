@@ -4,7 +4,7 @@ use anyhow::Result;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::Serialize;
 
-use crate::parse::{bytes_ser, LBLogParser, ParseLogError};
+use crate::parse::{bytes_ser, optional_bytes_ser, LBLogParser, ParseLogError};
 
 #[derive(Serialize)]
 pub struct Log<'a> {
@@ -72,6 +72,18 @@ pub struct Log<'a> {
     pub classification: &'a [u8],
     #[serde(serialize_with = "bytes_ser")]
     pub classification_reason: &'a [u8],
+
+    /// Optional TID (Traceability ID) field, added in May 2024
+    ///
+    /// ###### References
+    /// - https://github.com/simnalamburt/elb-log-parser/issues/11
+    /// - https://dev.classmethod.jp/articles/alb-accesslog-traceabilityid/
+    /// - https://repost.aws/knowledge-center/trace-elb-x-amzn-trace-id
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "optional_bytes_ser"
+    )]
+    pub tid: Option<&'a [u8]>,
 }
 
 pub struct LogParser {
@@ -174,6 +186,7 @@ impl LBLogParser for LogParser {
         "(Acceptable|Ambiguous|Severe|-)"                       # classification
         \x20
         "([a-zA-Z]+|-)"                                         # classification_reason, https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#classification-reasons
+        (?:\x20(TID_[a-zA-Z0-9]{32}|-))?                        # traceability_id (TID), added May 2024
         \x0A?
         $
     "#;
@@ -190,10 +203,8 @@ impl LBLogParser for LogParser {
             .captures_read(&mut locs, log)
             .ok_or_else(|| ParseLogError::InvalidLogFormat(log.to_owned()))?;
 
-        let s = |i| {
-            let (start, end) = locs.get(i).unwrap();
-            &log[start..end]
-        };
+        let optional = |i| locs.get(i).map(|(start, end)| &log[start..end]);
+        let s = |i| optional(i).unwrap();
 
         Ok(Log {
             r#type: s(1),
@@ -228,6 +239,7 @@ impl LBLogParser for LogParser {
             target_status_code_list: s(30),
             classification: s(31),
             classification_reason: s(32),
+            tid: optional(33),
         })
     }
 }
@@ -321,6 +333,12 @@ fn test_log_parser() -> Result<()> {
     t(
         br#"https 2023-06-01T12:34:56.123456Z app/myalb/0123456789abcdef 123.123.123.123:12345 10.0.12.34:80 0.001 0.002 0.003 302 302 123 456 "GET https://example.com/ HTTP/2.0" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36" TLS_AES_128_GCM_SHA256 TLSv1.3 arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef "Root=1-abcd0123-0123456789abcdef01234567" " some-subdomain.domain.com" "arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789" 0 2023-05-02T22:52:38.170000Z "redirect" "https://redirect.example.com?key1=value1&key2=..\x5C..\x5C..\x5Cwindows\x5Cwin.ini" "-" "-" "-" "-" "-""#,
         r#"{"type":"https","time":"2023-06-01T12:34:56.123456Z","elb":"app/myalb/0123456789abcdef","client_ip":"123.123.123.123","client_port":"12345","target_ip_port":"10.0.12.34:80","request_processing_time":"0.001","target_processing_time":"0.002","response_processing_time":"0.003","elb_status_code":"302","target_status_code":"302","received_bytes":"123","sent_bytes":"456","http_method":"GET","url":"https://example.com/","http_version":"HTTP/2.0","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36","ssl_cipher":"TLS_AES_128_GCM_SHA256","ssl_protocol":"TLSv1.3","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-2:012345678901:targetgroup/mytg/0123456789abcdef","trace_id":"Root=1-abcd0123-0123456789abcdef01234567","domain_name":"some-subdomain.domain.com","chosen_cert_arn":"arn:aws:acm:ap-northeast-2:012345678901:certificate/abcdefgh-abcd-efgh-ijkl-0123456789","matched_rule_priority":"0","request_creation_time":"2023-05-02T22:52:38.170000Z","actions_executed":"redirect","redirect_url":"https://redirect.example.com?key1=value1&key2=..\\x5C..\\x5C..\\x5Cwindows\\x5Cwin.ini","error_reason":"-","target_ip_port_list":"-","target_status_code_list":"-","classification":"-","classification_reason":"-"}"#
+    )?;
+
+    // A log with a TID field
+    t(
+        br#"h2 2024-05-28T13:34:14.804475Z app/myalb/7bba4eaafdb3bbc6 18.180.78.42:42088 172.31.11.24:80 0.006 0.000 0.000 200 200 115 124 "GET http://alb-example.ap-northeast-1.elb.amazonaws.com:80/ HTTP/1.1" "curl/8.5.0" - - arn:aws:elasticloadbalancing:ap-northeast-1:123456789012:targetgroup/mytg/f8e61ed9c1a92345 "Root=1-6655dd56-7bd889385aff85131b102345" "-" "-" 0 2024-05-28T13:34:14.797000Z "waf,forward" "-" "-" "172.31.11.24:80" "200" "-" "-" TID_dc57cebed65b444ebc8177bb698fe166"#,
+        r#"{"type":"h2","time":"2024-05-28T13:34:14.804475Z","elb":"app/myalb/7bba4eaafdb3bbc6","client_ip":"18.180.78.42","client_port":"42088","target_ip_port":"172.31.11.24:80","request_processing_time":"0.006","target_processing_time":"0.000","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"115","sent_bytes":"124","http_method":"GET","url":"http://alb-example.ap-northeast-1.elb.amazonaws.com:80/","http_version":"HTTP/1.1","user_agent":"curl/8.5.0","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-1:123456789012:targetgroup/mytg/f8e61ed9c1a92345","trace_id":"Root=1-6655dd56-7bd889385aff85131b102345","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"0","request_creation_time":"2024-05-28T13:34:14.797000Z","actions_executed":"waf,forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"172.31.11.24:80","target_status_code_list":"200","classification":"-","classification_reason":"-","tid":"TID_dc57cebed65b444ebc8177bb698fe166"}"#
     )?;
 
     Ok(())

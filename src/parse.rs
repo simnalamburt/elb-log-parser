@@ -49,3 +49,16 @@ where
         .map_err(|_| ser::Error::custom("log contains invalid UTF-8 characters"))?;
     serializer.serialize_str(str)
 }
+
+pub(crate) fn optional_bytes_ser<S>(
+    optional_bytes: &Option<&[u8]>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match optional_bytes {
+        Some(bytes) => bytes_ser(bytes, serializer),
+        None => serializer.serialize_none(),
+    }
+}
