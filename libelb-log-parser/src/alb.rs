@@ -75,9 +75,9 @@ pub struct Log<'a> {
     /// Optional TID (Traceability ID) field, added in May 2024
     ///
     /// ###### References
-    /// - https://github.com/simnalamburt/elb-log-parser/issues/11
-    /// - https://dev.classmethod.jp/articles/alb-accesslog-traceabilityid/
-    /// - https://repost.aws/knowledge-center/trace-elb-x-amzn-trace-id
+    /// - <https://github.com/simnalamburt/elb-log-parser/issues/11>
+    /// - <https://dev.classmethod.jp/articles/alb-accesslog-traceabilityid/>
+    /// - <https://repost.aws/knowledge-center/trace-elb-x-amzn-trace-id>
     #[serde(
         skip_serializing_if = "Option::is_none",
         serialize_with = "optional_bytes_ser"
