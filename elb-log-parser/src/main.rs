@@ -1,7 +1,3 @@
-mod alb;
-mod classic_lb;
-mod parse;
-
 use std::fs::{File, metadata};
 use std::io::{BufRead, BufReader, IsTerminal, Write, stderr, stdin, stdout};
 use std::thread;
@@ -13,9 +9,7 @@ use crossbeam_channel::unbounded;
 use flate2::read::MultiGzDecoder;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::alb::LogParser as ALBLogParser;
-use crate::classic_lb::LogParser as ClassicLBLogParser;
-use crate::parse::{LBLogParser, ParseLogError};
+use libelb_log_parser::{ALBLogParser, ClassicLBLogParser, LBLogParser, LBType, ParseLogError};
 
 #[derive(Parser)]
 #[command(
@@ -130,8 +124,8 @@ fn walkdir<T: LBLogParser>(path: &str, config: Config) -> Result<()> {
 
                     let file = File::open(path)?;
                     let reader: Box<dyn BufRead> = match T::TYPE {
-                        Type::Alb => Box::new(BufReader::new(MultiGzDecoder::new(file))),
-                        Type::ClassicLb => Box::new(BufReader::new(file)),
+                        LBType::Alb => Box::new(BufReader::new(MultiGzDecoder::new(file))),
+                        LBType::ClassicLb => Box::new(BufReader::new(file)),
                     };
                     for_each_parsed_lines::<T>(reader, config, |log| {
                         let json = serde_json::to_string(&log)?;

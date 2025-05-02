@@ -1,19 +1,23 @@
 use serde::{Serialize, Serializer, ser};
 use thiserror::Error;
 
-use crate::Type;
-
 #[derive(Error, Clone, Debug)]
 pub enum ParseLogError {
     #[error("Invalid log line: {}", String::from_utf8_lossy(.0))]
     InvalidLogFormat(Vec<u8>),
 }
 
-pub(crate) trait LBLogParser {
+#[derive(Clone)]
+pub enum LBType {
+    Alb,
+    ClassicLb,
+}
+
+pub trait LBLogParser {
     type Log<'input>: Serialize;
 
     const EXT: &'static str;
-    const TYPE: Type;
+    const TYPE: LBType;
     const REGEX: &'static str;
 
     fn new() -> Self;
