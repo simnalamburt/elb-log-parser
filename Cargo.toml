@@ -1,24 +1,9 @@
-[package]
-name = "elb-log-parser"
-version = "0.2.7"
-edition = "2024"
+[workspace]
+members = ["elb-log-parser"]
+resolver = "3"
+
+[workspace.package]
 authors = ["Jihyeon Kim <simnalamburt@gmail.com>"]
-description = "Simple AWS ELB log parser which parses Classic LB and ALB logs into JSONs."
-license = "AGPL-3.0-or-later"
-repository = "https://github.com/simnalamburt/elb-log-parser"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-regex = "1"
-regex-automata = "0.4"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-walkdir = "2"
-flate2 = "1"
-
-anyhow = { version = "1", features = ["backtrace"] }
-thiserror = "2"
-clap = { version = "4.0.22", features = ["derive"] }
-clap_complete = "4.5.33"
-crossbeam-channel = "0.5.15"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/simnalamburt/sample-rust-apps"
