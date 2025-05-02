@@ -175,5 +175,13 @@ fn test_log_parser() -> Result<()> {
         r#"{"time":"2015-03-27T07:06:41.177907Z","elb":"my-loadbalancer","client_ip":"192.168.131.39","client_port":"2817","backend_ip_port":"-","request_processing_time":"-1","backend_processing_time":"-1","response_processing_time":"-1","elb_status_code":"503","backend_status_code":"0","received_bytes":"0","sent_bytes":"0","http_method":"GET","url":"https://www.example.com:443/","http_version":"HTTP/1.1","user_agent":"curl/7.38.0","ssl_cipher":"ECDHE-RSA-AES128-GCM-SHA256","ssl_protocol":"TLSv1.2"}"#,
     )?;
 
+    //
+    // Error cases
+    //
+    let Err(ParseLogError::InvalidLogFormat(_)) = parser.parse(b"2015-03-27T07:06:41.177907Z")
+    else {
+        panic!("Expected error for incomplete log line");
+    };
+
     Ok(())
 }

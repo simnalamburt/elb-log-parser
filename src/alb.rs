@@ -341,5 +341,13 @@ fn test_log_parser() -> Result<()> {
         r#"{"type":"h2","time":"2024-05-28T13:34:14.804475Z","elb":"app/myalb/7bba4eaafdb3bbc6","client_ip":"18.180.78.42","client_port":"42088","target_ip_port":"172.31.11.24:80","request_processing_time":"0.006","target_processing_time":"0.000","response_processing_time":"0.000","elb_status_code":"200","target_status_code":"200","received_bytes":"115","sent_bytes":"124","http_method":"GET","url":"http://alb-example.ap-northeast-1.elb.amazonaws.com:80/","http_version":"HTTP/1.1","user_agent":"curl/8.5.0","ssl_cipher":"-","ssl_protocol":"-","target_group_arn":"arn:aws:elasticloadbalancing:ap-northeast-1:123456789012:targetgroup/mytg/f8e61ed9c1a92345","trace_id":"Root=1-6655dd56-7bd889385aff85131b102345","domain_name":"-","chosen_cert_arn":"-","matched_rule_priority":"0","request_creation_time":"2024-05-28T13:34:14.797000Z","actions_executed":"waf,forward","redirect_url":"-","error_reason":"-","target_ip_port_list":"172.31.11.24:80","target_status_code_list":"200","classification":"-","classification_reason":"-","tid":"TID_dc57cebed65b444ebc8177bb698fe166"}"#
     )?;
 
+    //
+    // Error cases
+    //
+    let Err(ParseLogError::InvalidLogFormat(_)) = parser.parse(b"h2 2024-05-28T13:34:14.804475Z")
+    else {
+        panic!("Expected error for incomplete log line");
+    };
+
     Ok(())
 }
