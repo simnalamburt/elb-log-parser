@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 
-use anyhow::Result;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::Serialize;
 
@@ -142,10 +141,13 @@ impl LBLogParser for LogParser {
 }
 
 #[test]
-fn test_log_parser() -> Result<()> {
+fn test_log_parser() -> Result<(), ParseLogError> {
     let parser = LogParser::new();
-    let t = |input, expected| -> Result<()> {
-        assert_eq!(serde_json::to_string(&mut parser.parse(input)?)?, expected);
+    let t = |input, expected| -> Result<(), ParseLogError> {
+        assert_eq!(
+            serde_json::to_string(&mut parser.parse(input)?).unwrap(),
+            expected
+        );
         Ok(())
     };
 
